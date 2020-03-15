@@ -11,13 +11,35 @@
 #include "sdlike.h"
 
 
+#define MAX_CELL_CAPACITY 255
+#define MIN_CELL_CAPACITY 2
+
+
+typedef enum ObjType {
+  ERROR,
+  GRASS,
+  WALL
+} ObjType;
+
+
+/**
+  Any object on the Level
+  (grass, wall, hero, etc)
+*/
+typedef struct Object {
+  ObjType type;
+  Tile* tile;
+} Object;
+
+
 /**
   Another cell on the field.
   Contains objects on this place.
 */
 typedef struct Cell {
-  char* type;
-  SDL_Surface* image;
+  unsigned depth;
+  unsigned capacity;
+  Object** objects;
 } Cell;
 
 
@@ -38,6 +60,7 @@ typedef struct Level {
 */
 int make_level_from_file(
   char* path,
+  TileStoreNode* tile_store,
   //
   Level** level
 );
@@ -55,6 +78,28 @@ void print_level(Level* level);
 int place_level(
   Level* level,
   SDL_Surface* screen
+);
+
+
+int make_cell(
+  char cell_symbol,
+  TileStoreNode* tile_store,
+  //
+  Cell** cell
+);
+
+
+int make_object(
+  ObjType type,
+  TileStoreNode* tile_store,
+  //
+  Object** obj
+);
+
+
+int push_object_to_cell (
+  Object* obj,
+  Cell* cell
 );
 
 #endif // _LEVEL_H_

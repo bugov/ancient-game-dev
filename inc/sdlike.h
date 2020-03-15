@@ -11,6 +11,13 @@
 #include "const.h"
 
 
+#ifdef DEBUG
+#define dp(...) do { fprintf( stderr, __VA_ARGS__ ); } while (0)
+#else
+#define dp(...) do { } while (0)
+#endif
+
+
 /**
   Initialize SDL window and screen surface.
 */

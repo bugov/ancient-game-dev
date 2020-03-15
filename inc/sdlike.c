@@ -1,5 +1,6 @@
 #include "sdlike.h"
 
+
 int init_sdl(
   char* title,
   unsigned width,
@@ -52,9 +53,7 @@ int load_image(
   SDL_Surface** img
 ) {
   if ((*img = IMG_Load(path)) == NULL) {
-  #ifdef DEBUG
-		printf("Image could not load: `%s`. SDL_Error: %s\n", path, SDL_GetError());
-  #endif
+    dp("Image could not load: `%s`. SDL_Error: %s\n", path, SDL_GetError());
     return 1;
   }
   
@@ -80,9 +79,7 @@ int place_surface_px(
   };
   
   if (SDL_BlitSurface(src, &src_rect, screen, &dst_rect)) {
-  #ifdef DEBUG
-		printf("Can't place a surface. SDL_Error: %s\n", SDL_GetError());
-  #endif
+    dp("Can't place a surface. SDL_Error: %s\n", SDL_GetError());
     return 1;
   }
   
@@ -111,10 +108,8 @@ int make_tile(
 ) {
   SDL_Surface* image;
   if(load_image(path, &image)) {
-  #ifdef DEBUG
-		printf("Failed on make tile: `%s`\n", name);
+    dp("Failed on make tile: `%s`\n", name);
 		return 1;
-  #endif
   }
   
   Tile* tile = (Tile*)malloc(sizeof(Tile));
@@ -128,16 +123,12 @@ int make_tile(
 
 
 int add_to_tile_store(TileStoreNode* head, Tile* tile) {
-  #ifdef DEBUG
-	  printf("Add tile to store: `%s`\n", tile->name);
-  #endif
+  dp("Add tile to store: `%s`\n", tile->name);
   TileStoreNode* node = head;
   
   if (node->tile != NULL) {
     if (strcmp(node->tile->name, tile->name) == 0) {
-      #ifdef DEBUG
-		    printf("Can't add tile (name already exists): `%s`\n", tile->name);
-      #endif
+      dp("Can't add tile (name already exists): `%s`\n", tile->name);
       return 1;
     }
   }
@@ -146,15 +137,14 @@ int add_to_tile_store(TileStoreNode* head, Tile* tile) {
     node = node->next;
     
     if (strcmp(node->tile->name, tile->name) == 0) {
-      #ifdef DEBUG
-		    printf("Can't add tile (name already exists): `%s`\n", tile->name);
-      #endif
+      dp("Can't add tile (name already exists): `%s`\n", tile->name);
       return 1;
     }
   }
     
   TileStoreNode* new_node = (TileStoreNode*)malloc(sizeof(TileStoreNode));
   new_node->tile = tile;
+  new_node->next = NULL;
   node->next = new_node;
   
   return 0;
@@ -167,9 +157,7 @@ int find_in_tile_store(
   //
   Tile** tile
 ) {
-  #ifdef DEBUG
-	  printf("Find tile in store: `%s`\n", name);
-  #endif
+  dp("Find tile in store: `%s`\n", name);
   TileStoreNode* node = head;
   
   while (node->next != NULL) {

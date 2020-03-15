@@ -27,11 +27,16 @@ void test_tile_store() {
   printf("Tile is fine.\n");
   
   TileStoreNode store = { NULL, NULL };
-  add_to_tile_store(&store, tile);
+  assert(add_to_tile_store(&store, tile) == 0);
   Tile* another_tile = NULL;
-  find_in_tile_store(&store, "grass", &another_tile);
+  assert(find_in_tile_store(&store, "grass", &another_tile) == 0);
   assert(strcmp(tile->name, another_tile->name) == 0);
-  assert(tile->name == another_tile->name);
+  assert(tile == another_tile);
+  
+  assert(make_tile("wall", "./tiles/wall.png", &tile) == 0);
+  assert(add_to_tile_store(&store, tile) == 0);
+  assert(find_in_tile_store(&store, "wall", &another_tile) == 0);
+  assert(strcmp(another_tile->name, "wall") == 0);
 }
 
 
