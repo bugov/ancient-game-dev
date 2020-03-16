@@ -11,7 +11,7 @@
 #include "sdlike.h"
 
 
-#define MAX_CELL_CAPACITY 255
+#define MAX_CELL_CAPACITY 256
 #define MIN_CELL_CAPACITY 2
 #define WALK_FRAMES 8
 #define WALK_STEP_PX 16
@@ -21,7 +21,8 @@ typedef enum ObjType {
   OBJECT_ERROR,
   OBJECT_GRASS,
   OBJECT_WALL,
-  OBJECT_HERO
+  OBJECT_HERO,
+  OBJECT_BARREL
 } ObjType;
 
 
@@ -47,6 +48,12 @@ typedef struct Object {
   Tile* tile;
   Tile* walk_tile;
   
+  int hp;
+  unsigned base_attack;
+  
+  unsigned x_pos;
+  unsigned y_pos;
+  
   char can_walk;
   char passable;
   char walkable;
@@ -63,6 +70,10 @@ typedef struct Object {
 typedef struct Cell {
   unsigned depth;
   unsigned capacity;
+  
+  unsigned x_pos;
+  unsigned y_pos;
+  
   Object** objects;
 } Cell;
 
@@ -108,15 +119,15 @@ int place_stay_level(
 int place_walk_object(
   Level* level,
   SDL_Surface* screen,
-  Object* obj,
-  unsigned x,
-  unsigned y
+  Object* obj
 );
 
 
 int make_cell(
   char cell_symbol,
   TileStoreNode* tile_store,
+  unsigned x_pos,
+  unsigned y_pos,
   //
   Cell** cell
 );
@@ -128,7 +139,7 @@ int is_cell_passable(Cell* cell);
 int set_walk_object_to_direction(
   Object* obj,
   ObjDirection direction,
-  Cell* destination
+  Level* level
 );
 
 
@@ -138,12 +149,22 @@ int animate_walk_frame(Object* obj);
 int make_object(
   ObjType type,
   TileStoreNode* tile_store,
+  unsigned x_pos,
+  unsigned y_pos,
   //
   Object** obj
 );
 
 
+void attack_object(Object* src, Object* dst);
+
 int push_object_to_cell (
+  Object* obj,
+  Cell* cell
+);
+
+
+int remove_object_from_cell (
   Object* obj,
   Cell* cell
 );

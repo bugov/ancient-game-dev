@@ -7,6 +7,7 @@ char* obj_type_to_str(ObjType type) {
     case OBJECT_GRASS: return "grass";
     case OBJECT_WALL: return "wall";
     case OBJECT_HERO: return "hero";
+    case OBJECT_BARREL: return "barrel";
     default:
       dp("Unknown type for convering to string.\n");
       return "error";
@@ -18,6 +19,7 @@ ObjType str_to_obj_type(char* str) {
   if (strcmp("grass", str) == 0) return OBJECT_GRASS;
   if (strcmp("wall", str) == 0) return OBJECT_WALL;
   if (strcmp("hero", str) == 0) return OBJECT_HERO;
+  if (strcmp("barrel", str) == 0) return OBJECT_BARREL;
   return OBJECT_ERROR;
 }
 
@@ -25,6 +27,8 @@ ObjType str_to_obj_type(char* str) {
 int make_object(
   ObjType type,
   TileStoreNode* tile_store,
+  unsigned x_pos,
+  unsigned y_pos,
   //
   Object** obj_ptr
 ) {
@@ -33,6 +37,8 @@ int make_object(
   Object* obj = *obj_ptr;
   obj->type = type;
   obj->state = STATE_STAY;
+  obj->x_pos = x_pos;
+  obj->y_pos = y_pos;
   
   Tile* tile;
   char* obj_type_name = obj_type_to_str(type);
@@ -41,17 +47,29 @@ int make_object(
   }
   obj->tile = tile;
   
+  // Attack / HP
+  obj->base_attack = 0;
+  switch (type) {
+    case OBJECT_HERO:
+      obj->hp = 5;
+      obj->base_attack = 2;
+      break;
+    case OBJECT_BARREL: obj->hp = 1; break;
+    default: obj->hp = 10000;
+  }
+  
   // Passability
   switch (type) {
     case OBJECT_HERO:
-    case OBJECT_WALL: obj->passable = 0; break;
-    default: obj->passable = 1;
+    case OBJECT_BARREL:
+    case OBJECT_WALL: obj->passable = 0; break; // no
+    default: obj->passable = 1;  // yes
   }
   
   // Walkability
   switch (type) {
-    case OBJECT_HERO: obj->walkable = 1; break;
-    default: obj->walkable = 0;
+    case OBJECT_HERO: obj->walkable = 1; break;  // yes
+    default: obj->walkable = 0; // no
   }
   
   if (obj->walkable) {
@@ -76,14 +94,26 @@ int make_object(
 int set_walk_object_to_direction(
   Object* obj,
   ObjDirection direction,
-  Cell* destination
+  Level* level
 ) {
   if (! obj->walkable) {
     dp("Object isn't walkable.\n");
     return 1;
   }
-  if (! is_cell_passable(destination)) {
-    dp("Cell isn't passable.\n");
+  
+  unsigned dx = 0;
+  unsigned dy = 0;
+  
+  switch (direction) {
+    case UP: dy = -1; break;
+    case DOWN: dy = 1; break;
+    case LEFT: dx = -1; break;
+    case RIGHT: dx = 1; break;
+  }
+  
+  Cell* cell = level->cells[obj->x_pos + dx][obj->y_pos + dy];
+  if (! is_cell_passable(cell)) {
+    dp("Cell %u;%u isn't passable.\n", obj->x_pos + dx, obj->y_pos + dy);
     return 2;
   }
   
@@ -101,7 +131,7 @@ int animate_walk_frame(Object* obj) {
     return 0;
   }
   
-  dp("Object walks...\n.");
+  dp("Object walks...\n");
   obj->walk_frame += 1;
   return 1;
 }
@@ -110,6 +140,8 @@ int animate_walk_frame(Object* obj) {
 int make_cell_from_char(
   char cell_symbol,
   TileStoreNode* tile_store,
+  unsigned x_pos,
+  unsigned y_pos,
   //
   Cell** cell_ptr
 ) {
@@ -119,17 +151,23 @@ int make_cell_from_char(
   cell->depth = 0;
   cell->capacity = MIN_CELL_CAPACITY;
   cell->objects = malloc(sizeof(Object*) * MIN_CELL_CAPACITY);
+  cell->x_pos = x_pos;
+  cell->y_pos = y_pos;
 
   Object* obj;
-  success |= make_object(OBJECT_GRASS, tile_store, &obj);
+  success |= make_object(OBJECT_GRASS, tile_store, x_pos, y_pos, &obj);
   success |= push_object_to_cell(obj, cell);
   
   if (cell_symbol == '#') {
-    success |= make_object(OBJECT_WALL, tile_store, &obj);
+    success |= make_object(OBJECT_WALL, tile_store, x_pos, y_pos, &obj);
     success |= push_object_to_cell(obj, cell);
   }
   else if (cell_symbol == '@') {
-    success |= make_object(OBJECT_HERO, tile_store, &obj);
+    success |= make_object(OBJECT_HERO, tile_store, x_pos, y_pos, &obj);
+    success |= push_object_to_cell(obj, cell);
+  }
+  else if (cell_symbol == 'B') {
+    success |= make_object(OBJECT_BARREL, tile_store, x_pos, y_pos, &obj);
     success |= push_object_to_cell(obj, cell);
   }
   
@@ -151,12 +189,19 @@ int push_object_to_cell (
     // expand stack if the limit reached
     Object** old_stack = cell->objects;
     cell->capacity *= 2;
-    cell->objects = malloc(sizeof(Object*) * cell->capacity);
+    cell->objects = (Object**)malloc(sizeof(Object*) * cell->capacity);
+    
+    memcpy(cell->objects, old_stack, cell->depth * sizeof(*old_stack));
     free(old_stack);
   }
 
   cell->objects[cell->depth] = obj;
   cell->depth += 1;
+  
+  // Fix object pos
+  obj->x_pos = cell->x_pos;
+  obj->y_pos = cell->y_pos;
+  
   return 0;
 }
 
@@ -197,9 +242,10 @@ int remove_object_from_cell (
 
 
 int is_cell_passable(Cell* cell) {
-  int passable = 0;
+  int passable = 1;
   for (int z = 0; z < cell->depth; ++z) {
-    passable |= cell->objects[z]->passable;
+    dp("Object `%s` passable: %u\n", cell->objects[z]->tile->name, cell->objects[z]->passable * 1);
+    passable &= cell->objects[z]->passable;
   }
   return passable;
 }
@@ -243,7 +289,7 @@ int make_level_from_file(
       }
       dp("Read cell %u;%u symbol `%c`\n", x, y, cell_symbol);
       
-      make_cell_from_char(cell_symbol, tile_store, &cell);
+      make_cell_from_char(cell_symbol, tile_store, x, y, &cell);
       level->cells[x][y] = cell;
     }
     fscanf(file, "\n");  // slurp NL
@@ -270,6 +316,7 @@ void print_level(Level* level) {
           case OBJECT_GRASS: printf(" "); break;
           case OBJECT_WALL: printf("#"); break;
           case OBJECT_HERO: printf("@"); break;
+          case OBJECT_BARREL: printf("B"); break;
           default: dp("Unknown cell type `%u`.\n", obj->type);
         }
       } else {
@@ -281,6 +328,12 @@ void print_level(Level* level) {
 }
 
 
+void attack_object(Object* src, Object* dst) {
+  dst->hp -= src->base_attack;
+  dp("`%s` attacked by `%s`. Result HP: `%d`.\n", dst->tile->name, src->tile->name, dst->hp);
+}
+
+
 int place_stay_level(Level* level, SDL_Surface* screen) {
   int success = 0;
   Object* obj = NULL;
@@ -288,7 +341,6 @@ int place_stay_level(Level* level, SDL_Surface* screen) {
   for (int x = 0; x < level->w; ++x) {
     for (int y = 0; y < level->h; ++y) {
       for (int z = 0; z < level->cells[x][y]->depth; ++z) {
-        dp("Render stay %u;%u.\n", x, y);
         obj = level->cells[x][y]->objects[z];
         
         if (obj->state == STATE_STAY) {
@@ -305,27 +357,53 @@ int place_stay_level(Level* level, SDL_Surface* screen) {
 int place_walk_object(
   Level* level,
   SDL_Surface* screen,
-  Object* obj,
-  unsigned x,
-  unsigned y
+  Object* obj
 ) {
   int success = 0;
 
-  int dx = 0;
-  int dy = 0;
-  
+  int dx_pos = 0;
+  int dy_pos = 0;
   switch (obj->direction) {
-    case UP: dy = -obj->walk_frame * WALK_STEP_PX; break;
-    case DOWN: dy = obj->walk_frame * WALK_STEP_PX; break;
-    case LEFT: dx = -obj->walk_frame * WALK_STEP_PX; break;
-    case RIGHT: dx = obj->walk_frame * WALK_STEP_PX; break;
+    case UP: dy_pos = -1; break;
+    case DOWN: dy_pos = 1; break;
+    case LEFT: dx_pos = -1; break;
+    case RIGHT: dx_pos = 1; break;
   }
-  unsigned to_x_px = x * CELL_WIDTH + dx;
-  unsigned to_y_px = y * CELL_WIDTH + dy;
+  unsigned to_x_px = obj->x_pos * CELL_WIDTH + dx_pos * obj->walk_frame * WALK_STEP_PX;
+  unsigned to_y_px = obj->y_pos * CELL_WIDTH + dy_pos * obj->walk_frame * WALK_STEP_PX;
   
   unsigned from_x_px = obj->walk_frame * CELL_WIDTH;
   unsigned from_y_px = obj->direction * CELL_HEIGHT;
   
+  // Rerender cell
+  Cell* prev_cell = level->cells[obj->x_pos][obj->y_pos];
+  for (int z = 0; z < prev_cell->depth; ++z) {
+    Object* cell_obj = prev_cell->objects[z];
+    
+    if (cell_obj != obj && cell_obj->state == STATE_STAY) {
+      success |= place_surface_pos(
+        cell_obj->x_pos,
+        cell_obj->y_pos,
+        cell_obj->tile->image,
+        screen
+      );
+    }
+  }
+  Cell* next_cell = level->cells[obj->x_pos + dx_pos][obj->y_pos + dy_pos];
+  for (int z = 0; z < next_cell->depth; ++z) {
+    Object* cell_obj = next_cell->objects[z];
+    
+    if (cell_obj != obj && cell_obj->state == STATE_STAY) {
+      success |= place_surface_pos(
+        cell_obj->x_pos,
+        cell_obj->y_pos,
+        cell_obj->tile->image,
+        screen
+      );
+    }
+  }
+  
+  // Render walking object
   success |= place_surface_part_px(
     from_x_px,
     from_y_px,

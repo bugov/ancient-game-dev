@@ -128,5 +128,10 @@ int make_tile(
 );
 
 
+void make_cursor(
+  const char* image[],
+  SDL_Cursor** cursor
+);
+
 #endif // _SDLIKE_H_
 
