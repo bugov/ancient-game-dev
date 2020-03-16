@@ -40,6 +40,7 @@ function build_and_test {
 
 function command_test {
     build_and_test "./test/test_sdlike.c" \
+        && sleep 1 && build_and_test "./test/test_level.c" \
         && printf -- "\033[32m[+] All fine\033[0m\n" \
         || printf -- "\033[31m[-] An error occured\033[0m\n"
 }

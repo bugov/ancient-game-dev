@@ -13,13 +13,28 @@
 
 #define MAX_CELL_CAPACITY 255
 #define MIN_CELL_CAPACITY 2
+#define WALK_FRAMES 8
+#define WALK_STEP_PX 16
 
 
 typedef enum ObjType {
-  ERROR,
-  GRASS,
-  WALL
+  OBJECT_ERROR,
+  OBJECT_GRASS,
+  OBJECT_WALL,
+  OBJECT_HERO
 } ObjType;
+
+
+typedef enum ObjState {
+  STATE_ERROR,
+  STATE_STAY,
+  STATE_WALK,
+} ObjState;
+
+
+typedef enum ObjDirection {
+  UP, LEFT, DOWN, RIGHT
+} ObjDirection;
 
 
 /**
@@ -28,7 +43,16 @@ typedef enum ObjType {
 */
 typedef struct Object {
   ObjType type;
+  ObjState state;
   Tile* tile;
+  Tile* walk_tile;
+  
+  char can_walk;
+  char passable;
+  char walkable;
+  
+  char walk_frame;
+  ObjDirection direction;
 } Object;
 
 
@@ -75,9 +99,18 @@ void print_level(Level* level);
 /**
   Put the level to the screen.
 */
-int place_level(
+int place_stay_level(
   Level* level,
   SDL_Surface* screen
+);
+
+
+int place_walk_object(
+  Level* level,
+  SDL_Surface* screen,
+  Object* obj,
+  unsigned x,
+  unsigned y
 );
 
 
@@ -87,6 +120,19 @@ int make_cell(
   //
   Cell** cell
 );
+
+
+int is_cell_passable(Cell* cell);
+
+
+int set_walk_object_to_direction(
+  Object* obj,
+  ObjDirection direction,
+  Cell* destination
+);
+
+
+int animate_walk_frame(Object* obj);
 
 
 int make_object(
@@ -100,6 +146,13 @@ int make_object(
 int push_object_to_cell (
   Object* obj,
   Cell* cell
+);
+
+
+int swap_object_between_cells(
+  Object* obj,
+  Cell* src,
+  Cell* dst
 );
 
 #endif // _LEVEL_H_

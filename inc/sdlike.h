@@ -50,6 +50,26 @@ int load_image(
 );
 
 
+int place_surface_part_px(
+  unsigned from_x,
+  unsigned from_y,
+  unsigned to_x,
+  unsigned to_y,
+  SDL_Surface* src,
+  SDL_Surface* screen
+);
+
+
+int place_surface_part_pos(
+  unsigned from_x,
+  unsigned from_y,
+  unsigned to_x,
+  unsigned to_y,
+  SDL_Surface* src,
+  SDL_Surface* screen
+);
+
+
 /**
   Copy image data into screen surface.
   x, y - position on screen in PIXELS.

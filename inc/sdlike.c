@@ -60,30 +60,60 @@ int load_image(
   return 0;
 }
 
-
-int place_surface_px(
-  unsigned x, unsigned y,
-  SDL_Surface* src, SDL_Surface* screen
+int place_surface_part_px(
+  unsigned from_x,
+  unsigned from_y,
+  unsigned to_x,
+  unsigned to_y,
+  SDL_Surface* src,
+  SDL_Surface* screen
 ) {
   SDL_Rect src_rect = {
-    .x = 0,
-    .y = 0,
+    .x = from_x,
+    .y = from_y,
     .w = CELL_WIDTH,
     .h = CELL_HEIGHT
   };
   SDL_Rect dst_rect = {
-    .x = x,
-    .y = y,
+    .x = to_x,
+    .y = to_y,
     .w = CELL_WIDTH,
     .h = CELL_HEIGHT,
   };
-  
+
   if (SDL_BlitSurface(src, &src_rect, screen, &dst_rect)) {
     dp("Can't place a surface. SDL_Error: %s\n", SDL_GetError());
     return 1;
   }
   
   return 0;
+}
+
+
+int place_surface_part_pos(
+  unsigned from_x,
+  unsigned from_y,
+  unsigned to_x,
+  unsigned to_y,
+  SDL_Surface* src,
+  SDL_Surface* screen
+) {
+  return place_surface_part_px(
+    from_x * CELL_WIDTH,
+    from_y * CELL_HEIGHT,
+    to_x * CELL_WIDTH,
+    to_y * CELL_HEIGHT,
+    src,
+    screen
+  );
+}
+
+
+int place_surface_px(
+  unsigned x, unsigned y,
+  SDL_Surface* src, SDL_Surface* screen
+) {
+  return place_surface_part_px(0, 0, x, y, src, screen);
 }
 
 
