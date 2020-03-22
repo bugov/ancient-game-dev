@@ -1,6 +1,6 @@
 ## ToDo list
 
-- [ ] Multitile objects. For example - wall (different positions).
+- [x] Multitile objects. For example - wall (different positions).
 - [ ] Pseudo random multitile.
 - [x] Level borders.
 - [ ] Fix interface icons.

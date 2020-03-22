@@ -181,6 +181,9 @@ int make_level_from_file(
 );
 
 
+void fix_objects_tile(Context* ctx);
+
+
 void attack_object(Object* src, Object* dst);
 
 

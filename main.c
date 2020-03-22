@@ -18,9 +18,6 @@ int load_tiles(Context* ctx) {
   success |= make_tile("wall", "./tiles/wall.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
-  success |= make_tile("wall_top", "./tiles/wall_top.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
   success |= make_tile("human_walk", "./tiles/human_walk.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
@@ -150,12 +147,12 @@ void handle_click(Context* ctx, int x_px, int y_px) {
       ctx->mode = MODE_NORMAL;
     }
   } else { // MODE_NORMAL
-      // door
       switch (target_obj->type) {
         case OBJECT_DOOR:
           dp("Toggle door passable\n");
           target_obj->animation_frame ^= 1; // closed / opened
           target_obj->passable ^= 1;
+          break;
       }
   }
 }
@@ -290,10 +287,14 @@ int main(void) {
   }
 
   Level* level;
+  
   make_level_from_file(&ctx, "./level0.txt", &level);
+  
   Object* hero = level->cells[1][1]->objects[1];
   ctx.level = level;
   ctx.hero = hero;
+  
+  fix_objects_tile(&ctx);
   
   SDL_EventState(SDL_MOUSEMOTION, SDL_IGNORE);
   

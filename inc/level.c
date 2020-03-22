@@ -47,7 +47,6 @@ char* obj_type_to_str(ObjType type) {
     case OBJECT_GRASS: return "grass";
     case OBJECT_DOOR: return "door";
     case OBJECT_WALL: return "wall";
-    case OBJECT_WALL_TOP: return "wall_top";
     case OBJECT_HERO: return "hero";
     case OBJECT_HUMAN: return "human";
     case OBJECT_BARREL: return "barrel";
@@ -61,7 +60,6 @@ char* obj_type_to_str(ObjType type) {
 ObjType str_to_obj_type(char* str) {
   if (strcmp("grass", str) == 0) return OBJECT_GRASS;
   if (strcmp("door", str) == 0) return OBJECT_DOOR;
-  if (strcmp("wall_top", str) == 0) return OBJECT_WALL_TOP;
   if (strcmp("wall", str) == 0) return OBJECT_WALL;
   if (strcmp("hero", str) == 0) return OBJECT_HERO;
   if (strcmp("human", str) == 0) return OBJECT_HUMAN;
@@ -131,7 +129,6 @@ int make_object(
     case OBJECT_HERO:
     case OBJECT_HUMAN:
     case OBJECT_BARREL:
-    case OBJECT_WALL_TOP:
     case OBJECT_WALL: obj->passable = 0; break; // no
     default: obj->passable = 1;  // yes
   }
@@ -159,14 +156,6 @@ int make_object(
   }
   
   return 0;
-}
-
-
-/**
-  Find buildings / locations (closed spaces)
-*/
-int fix_object_tiles(Context* ctx) {
-
 }
 
 
@@ -269,10 +258,6 @@ int make_cell_from_char(
   switch (cell_symbol) {
     case '#':
       success |= make_object(ctx, OBJECT_WALL, x_pos, y_pos, &obj);
-      success |= push_object_to_cell(obj, cell);
-      break;
-    case '^':
-      success |= make_object(ctx, OBJECT_WALL_TOP, x_pos, y_pos, &obj);
       success |= push_object_to_cell(obj, cell);
       break;
     case '@':
@@ -428,6 +413,26 @@ int make_level_from_file(
 error:
   fclose(file);
   return 1;
+}
+
+
+/**
+  Find buildings / locations (closed spaces)
+*/
+void fix_objects_tile(Context* ctx) {
+  for (int x = 0; x < ctx->level->w; ++x) {
+    for (int y = 0; y < ctx->level->h; ++y) {
+      Object* obj = ctx->level->cells[x][y]->objects[ctx->level->cells[x][y]->depth - 1];
+      // Multitile for walls
+      if (obj->type == OBJECT_WALL && y < ctx->level->h - 1) {
+        Cell* bottom_cell = ctx->level->cells[x][y + 1];
+        if (bottom_cell->objects[bottom_cell->depth - 1]->type == OBJECT_WALL) {
+          dp("Fix wall tile on %u;%u\n", x, y);
+          obj->animation_frame = 1; // wall from top
+        }
+      }
+    }
+  }
 }
 
 
