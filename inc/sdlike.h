@@ -8,14 +8,7 @@
 #include "stdlib.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include "const.h"
-
-
-#ifdef DEBUG
-#define dp(...) do { fprintf( stderr, __VA_ARGS__ ); } while (0)
-#else
-#define dp(...) do { } while (0)
-#endif
+#include "common.h"
 
 
 /**
@@ -27,7 +20,7 @@ int init_sdl(
   unsigned height,
   //
   SDL_Window** window,
-  SDL_Surface** screen_surface
+  SDL_Renderer** renderer
 );
 
 
@@ -36,7 +29,7 @@ int init_sdl(
 */
 int destroy_sdl(
   SDL_Window** window,
-  SDL_Surface** screen
+  SDL_Renderer** renderer
 );
 
 
@@ -45,28 +38,29 @@ int destroy_sdl(
 */
 int load_image(
   char* path,
+  SDL_Renderer* renderer,
   //
-  SDL_Surface** img
+  SDL_Texture** img
 );
 
 
-int place_surface_part_px(
+int render_surface_part_px(
   unsigned from_x,
   unsigned from_y,
   unsigned to_x,
   unsigned to_y,
-  SDL_Surface* src,
-  SDL_Surface* screen
+  SDL_Texture* src,
+  SDL_Renderer* renderer
 );
 
 
-int place_surface_part_pos(
+int render_surface_part_pos(
   unsigned from_x,
   unsigned from_y,
   unsigned to_x,
   unsigned to_y,
-  SDL_Surface* src,
-  SDL_Surface* screen
+  SDL_Texture* src,
+  SDL_Renderer* renderer
 );
 
 
@@ -75,11 +69,11 @@ int place_surface_part_pos(
   x, y - position on screen in PIXELS.
   w, h - CELL_*
 */
-int place_surface_px(
+int render_surface_px(
   unsigned x,
   unsigned y,
-  SDL_Surface* src,
-  SDL_Surface* screen
+  SDL_Texture* src,
+  SDL_Renderer* renderer
 );
 
 
@@ -88,15 +82,17 @@ int place_surface_px(
   x, y - position on screen in CELLS.
   w, h - CELL_*
 */
-int place_surface_pos(
-  unsigned x, unsigned y,
-  SDL_Surface* src, SDL_Surface* screen
+int render_surface_pos(
+  unsigned x,
+  unsigned y,
+  SDL_Texture* src,
+  SDL_Renderer* renderer
 );
 
 
 typedef struct Tile {
   char* name;
-  SDL_Surface* image;
+  SDL_Texture* image;
 } Tile;
 
 
@@ -123,14 +119,18 @@ int find_in_tile_store(
 int make_tile(
   char* name,
   char* path,
+  SDL_Renderer* renderer,
   //
   Tile** return_tile
 );
 
 
-void make_cursor(
-  const char* image[],
-  SDL_Cursor** cursor
+int set_viewport(
+  int x,
+  int y,
+  int w,
+  int h,
+  SDL_Renderer* renderer
 );
 
 #endif // _SDLIKE_H_

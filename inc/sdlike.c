@@ -7,9 +7,9 @@ int init_sdl(
   unsigned height,
   //
   SDL_Window** window,
-  SDL_Surface** screen_surface
+  SDL_Renderer** renderer
 ) {
-  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+  if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		return 1;
 	}
 	
@@ -19,15 +19,18 @@ int init_sdl(
 	  SDL_WINDOWPOS_UNDEFINED,
 	  width,
 	  height,
-	  SDL_WINDOW_SHOWN
+	  SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
 	);
 	
 	if (*window == NULL) {
 		return 2;
 	}
 	
-  *screen_surface = SDL_GetWindowSurface(*window);
-  if (*screen_surface == NULL) {
+  *renderer = SDL_CreateRenderer(
+    *window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
+  );
+  
+  if (*renderer == NULL) {
     return 3;
   }
 	
@@ -35,13 +38,11 @@ int init_sdl(
 }
 
 
-int destroy_sdl(SDL_Window** window, SDL_Surface** screen) {
+int destroy_sdl(SDL_Window** window, SDL_Renderer** renderer) {
+	SDL_DestroyRenderer(*renderer);
+	*renderer = NULL;
 	SDL_DestroyWindow(*window);
 	*window = NULL;
-	
-	SDL_FreeSurface(*screen);
-	*screen = NULL;
-
 	SDL_Quit();
 	return 0;
 }
@@ -49,24 +50,33 @@ int destroy_sdl(SDL_Window** window, SDL_Surface** screen) {
 
 int load_image(
   char* path,
+  SDL_Renderer* renderer,
   //
-  SDL_Surface** img
+  SDL_Texture** img
 ) {
-  if ((*img = IMG_Load(path)) == NULL) {
+  SDL_Surface* img_surf = IMG_Load(path);
+  if (img_surf == NULL) {
     dp("Image could not load: `%s`. SDL_Error: %s\n", path, SDL_GetError());
     return 1;
+  }
+  
+  *img = SDL_CreateTextureFromSurface(renderer, img_surf);
+  SDL_FreeSurface(img_surf);
+  
+  if (*img == NULL) {
+    dp("Can't load `%s`: `%s`.\n", path, SDL_GetError());
   }
   
   return 0;
 }
 
-int place_surface_part_px(
+int render_surface_part_px(
   unsigned from_x,
   unsigned from_y,
   unsigned to_x,
   unsigned to_y,
-  SDL_Surface* src,
-  SDL_Surface* screen
+  SDL_Texture* src,
+  SDL_Renderer* renderer
 ) {
   SDL_Rect src_rect = {
     .x = from_x,
@@ -81,8 +91,8 @@ int place_surface_part_px(
     .h = CELL_HEIGHT,
   };
 
-  if (SDL_BlitSurface(src, &src_rect, screen, &dst_rect)) {
-    dp("Can't place a surface. SDL_Error: %s\n", SDL_GetError());
+  if (SDL_RenderCopy(renderer, src, &src_rect, &dst_rect)) {
+    dp("Can't render a texture. SDL_Error: %s\n", SDL_GetError());
     return 1;
   }
   
@@ -90,42 +100,46 @@ int place_surface_part_px(
 }
 
 
-int place_surface_part_pos(
+int render_surface_part_pos(
   unsigned from_x,
   unsigned from_y,
   unsigned to_x,
   unsigned to_y,
-  SDL_Surface* src,
-  SDL_Surface* screen
+  SDL_Texture* src,
+  SDL_Renderer* renderer
 ) {
-  return place_surface_part_px(
+  return render_surface_part_px(
     from_x * CELL_WIDTH,
     from_y * CELL_HEIGHT,
     to_x * CELL_WIDTH,
     to_y * CELL_HEIGHT,
     src,
-    screen
+    renderer
   );
 }
 
 
-int place_surface_px(
-  unsigned x, unsigned y,
-  SDL_Surface* src, SDL_Surface* screen
+int render_surface_px(
+  unsigned x,
+  unsigned y,
+  SDL_Texture* src,
+  SDL_Renderer* renderer
 ) {
-  return place_surface_part_px(0, 0, x, y, src, screen);
+  return render_surface_part_px(0, 0, x, y, src, renderer);
 }
 
 
-int place_surface_pos(
-  unsigned x, unsigned y,
-  SDL_Surface* src, SDL_Surface* screen
+int render_surface_pos(
+  unsigned x,
+  unsigned y,
+  SDL_Texture* src,
+  SDL_Renderer* renderer
 ) {
-  return place_surface_px(
+  return render_surface_px(
     x * CELL_WIDTH,
     y * CELL_HEIGHT,
     src,
-    screen
+    renderer
   );
 }
 
@@ -133,11 +147,12 @@ int place_surface_pos(
 int make_tile(
   char* name,
   char* path,
+  SDL_Renderer* renderer,
   //
   Tile** return_tile
 ) {
-  SDL_Surface* image;
-  if(load_image(path, &image)) {
+  SDL_Texture* image;
+  if(load_image(path, renderer, &image)) {
     dp("Failed on make tile: `%s`\n", name);
 		return 1;
   }
@@ -187,7 +202,7 @@ int find_in_tile_store(
   //
   Tile** tile
 ) {
-  dp("Find tile in store: `%s`\n", name);
+  //dp("Find tile in store: `%s`\n", name);
   TileStoreNode* node = head;
   
   while (node->next != NULL) {
@@ -203,42 +218,18 @@ int find_in_tile_store(
 }
 
 
-void make_cursor(
-  const char* image[],
-  SDL_Cursor** cursor
-) {
-  int i, row, col;
-  Uint8 data[4*32];
-  Uint8 mask[4*32];
-  int hot_x, hot_y;
-
-  i = -1;
-  for (row = 0; row < 32; ++row) {
-    for (col = 0; col < 32; ++col) {
-      if (col % 8) {
-        data[i] <<= 1;
-        mask[i] <<= 1;
-      } else {
-        ++i;
-        data[i] = mask[i] = 0;
-      }
-      
-      switch (image[4+row][col]) {
-        case 'X':
-          data[i] |= 0x01;
-          mask[i] |= 0x01;
-          break;
-        case '.':
-          mask[i] |= 0x01;
-          break;
-        case ' ':
-          break;
-      }
-    }
+int set_viewport(int x, int y, int w, int h, SDL_Renderer* renderer) {
+  SDL_Rect rect = {
+    .x = x,
+    .y = y,
+    .w = w,
+    .h = h
+  };
+  
+  if (SDL_RenderSetViewport(renderer, &rect) != 0) {
+    dp("Error set viewport: %s\n", SDL_GetError());
+    return 1;
   }
-  sscanf(image[4+row], "%d,%d", &hot_x, &hot_y);
-  SDL_Cursor* result = SDL_CreateCursor(data, mask, 32, 32, hot_x, hot_y);
-  cursor = &result;
+  return 0;
 }
-
 

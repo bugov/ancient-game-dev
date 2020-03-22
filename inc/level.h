@@ -13,7 +13,7 @@
 
 #define MAX_CELL_CAPACITY 256
 #define MIN_CELL_CAPACITY 2
-#define WALK_FRAMES 8
+#define WALK_FRAMES 6
 #define WALK_STEP_PX 16
 
 
@@ -21,6 +21,7 @@ typedef enum ObjType {
   OBJECT_ERROR,
   OBJECT_GRASS,
   OBJECT_WALL,
+  OBJECT_WALL_TOP,
   OBJECT_HERO,
   OBJECT_BARREL
 } ObjType;
@@ -53,6 +54,8 @@ typedef struct Object {
   
   unsigned x_pos;
   unsigned y_pos;
+  unsigned x_px;
+  unsigned y_px;
   
   char can_walk;
   char passable;
@@ -74,6 +77,8 @@ typedef struct Cell {
   unsigned x_pos;
   unsigned y_pos;
   
+  char changed;
+  
   Object** objects;
 } Cell;
 
@@ -89,74 +94,54 @@ typedef struct Level {
 } Level;
 
 
-/**
-  Read text file with level definition
-  and create a level.
-*/
-int make_level_from_file(
-  char* path,
-  TileStoreNode* tile_store,
-  //
-  Level** level
-);
+typedef enum GameMode {
+  MODE_NORMAL,
+  MODE_ATTACK
+} GameMode;
 
 
-/**
-  Debug function. Prints level to stdout.
-*/
-void print_level(Level* level);
-
-
-/**
-  Put the level to the screen.
-*/
-int place_stay_level(
-  Level* level,
-  SDL_Surface* screen
-);
-
-
-int place_walk_object(
-  Level* level,
-  SDL_Surface* screen,
-  Object* obj
-);
-
-
-int make_cell(
-  char cell_symbol,
-  TileStoreNode* tile_store,
-  unsigned x_pos,
-  unsigned y_pos,
-  //
-  Cell** cell
-);
-
-
-int is_cell_passable(Cell* cell);
-
-
-int set_walk_object_to_direction(
-  Object* obj,
-  ObjDirection direction,
-  Level* level
-);
-
-
-int animate_walk_frame(Object* obj);
+typedef struct Context {
+  GameMode mode;
+  TileStoreNode* tile_store;
+  Level* level;
+  Object* hero;
+  SDL_Renderer* renderer;
+  unsigned window_width;
+  unsigned window_height;
+  char is_running;
+  unsigned is_busy;
+} Context;
 
 
 int make_object(
+  Context* ctx,
   ObjType type,
-  TileStoreNode* tile_store,
   unsigned x_pos,
   unsigned y_pos,
   //
-  Object** obj
+  Object** obj_ptr
 );
 
 
-void attack_object(Object* src, Object* dst);
+int set_walk_object_to_direction(
+  Context* ctx,
+  Object* obj,
+  ObjDirection direction
+);
+
+
+int update_walk_frame(Object* obj);
+
+
+int make_cell_from_char(
+  Context* ctx,
+  char cell_symbol,
+  unsigned x_pos,
+  unsigned y_pos,
+  //
+  Cell** cell_ptr
+);
+
 
 int push_object_to_cell (
   Object* obj,
@@ -168,6 +153,23 @@ int remove_object_from_cell (
   Object* obj,
   Cell* cell
 );
+
+
+int is_cell_passable(Cell* cell);
+
+
+int make_level_from_file(
+  Context* ctx,
+  char* path,
+  //
+  Level** level_ptr
+);
+
+
+void attack_object(Object* src, Object* dst);
+
+
+int render_level(Context* ctx);
 
 
 int swap_object_between_cells(
