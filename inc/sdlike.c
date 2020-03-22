@@ -33,6 +33,10 @@ int init_sdl(
   if (*renderer == NULL) {
     return 3;
   }
+  
+  if(TTF_Init() < 0) {
+    return 4;
+  }
 	
 	return 0;
 }

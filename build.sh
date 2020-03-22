@@ -10,7 +10,8 @@ function build {
         ./inc/*.c \
         -o a.out \
         -lSDL2 \
-        -lSDL2_image
+        -lSDL2_image \
+        -lSDL2_ttf
     ret=$?
     echo "=========================== END BUILD ==========================="
     return $ret

@@ -1,6 +1,46 @@
 #include "level.h"
 #include "sdlike.h"
 
+#define MESSAGE_FONT_SIZE 24
+
+
+int make_message(
+  Context* ctx,
+  char* text,
+  //
+  Message** message_ptr
+) {
+  TTF_Font* font = TTF_OpenFont("./assets/Anonymous.ttf", MESSAGE_FONT_SIZE);
+  if (font == NULL) {
+    dp("An error on font load: %s\n", SDL_GetError());
+    return 1;
+  }
+  
+  SDL_Color color = {255, 255, 255};
+  SDL_Surface* message_surf = TTF_RenderText_Solid(font, text, color);
+  if (message_surf == NULL) {
+    dp("An error on creating font surface: %s\n", SDL_GetError());
+    return 1;
+  }
+  
+  SDL_Texture* message_texture = SDL_CreateTextureFromSurface(ctx->renderer, message_surf);
+  if (message_texture == NULL) {
+    dp("An error on creating font texture: %s\n", SDL_GetError());
+    return 1;
+  }
+  
+  SDL_FreeSurface(message_surf);
+  
+  *message_ptr = (Message*)malloc(sizeof(Message));
+  Message* message = *message_ptr;
+  message->image = message_texture;
+  message->text = text;
+  message->h = MESSAGE_FONT_SIZE;
+  message->w = strlen(message->text) * MESSAGE_FONT_SIZE;
+  
+  return 0;
+}
+
 
 char* obj_type_to_str(ObjType type) {
   switch (type) {
@@ -8,6 +48,7 @@ char* obj_type_to_str(ObjType type) {
     case OBJECT_WALL: return "wall";
     case OBJECT_WALL_TOP: return "wall_top";
     case OBJECT_HERO: return "hero";
+    case OBJECT_HUMAN: return "human";
     case OBJECT_BARREL: return "barrel";
     default:
       dp("Unknown type for convering to string.\n");
@@ -21,6 +62,7 @@ ObjType str_to_obj_type(char* str) {
   if (strcmp("wall_top", str) == 0) return OBJECT_WALL_TOP;
   if (strcmp("wall", str) == 0) return OBJECT_WALL;
   if (strcmp("hero", str) == 0) return OBJECT_HERO;
+  if (strcmp("human", str) == 0) return OBJECT_HUMAN;
   if (strcmp("barrel", str) == 0) return OBJECT_BARREL;
   return OBJECT_ERROR;
 }
@@ -51,9 +93,27 @@ int make_object(
   }
   obj->tile = tile;
   
+  Message* msg_hello = NULL;
+  make_message(ctx, "hello!", &msg_hello);
+  
+  // Talks
+  switch (type) {
+    case OBJECT_HUMAN:
+    case OBJECT_HERO:
+      obj->talkable = 1;
+      break;
+    default: obj->talkable = 0;
+  }
+  
+  if (obj->talkable) {
+    obj->messages = (Message**)malloc(sizeof(Message*) * 1); // message array
+    obj->messages[0] = msg_hello;
+  }
+  
   // Attack / HP
   obj->base_attack = 0;
   switch (type) {
+    case OBJECT_HUMAN:
     case OBJECT_HERO:
       obj->hp = 5;
       obj->base_attack = 2;
@@ -65,6 +125,7 @@ int make_object(
   // Passability
   switch (type) {
     case OBJECT_HERO:
+    case OBJECT_HUMAN:
     case OBJECT_BARREL:
     case OBJECT_WALL_TOP:
     case OBJECT_WALL: obj->passable = 0; break; // no
@@ -73,6 +134,7 @@ int make_object(
   
   // Walkability
   switch (type) {
+    case OBJECT_HUMAN:
     case OBJECT_HERO: obj->walkable = 1; break;  // yes
     default: obj->walkable = 0; // no
   }
@@ -106,8 +168,8 @@ int set_walk_object_to_direction(
     return 1;
   }
   
-  unsigned dx = 0;
-  unsigned dy = 0;
+  int dx = 0;
+  int dy = 0;
   
   switch (direction) {
     case UP: dy = -1; break;
@@ -116,12 +178,24 @@ int set_walk_object_to_direction(
     case RIGHT: dx = 1; break;
   }
   
+  // Level borders
+  if (
+    (int)obj->x_pos + dx < 0
+    || (int)obj->x_pos + dx > ctx->level->w
+    || (int)obj->y_pos + dy < 0
+    || (int)obj->y_pos + dy >= ctx->level->h
+  ) {
+    dp("Level border is not passable.\n");
+    return 3;
+  }
+  
   Cell* cell = ctx->level->cells[obj->x_pos + dx][obj->y_pos + dy];
   if (! is_cell_passable(cell)) {
     dp("Cell %u;%u isn't passable.\n", obj->x_pos + dx, obj->y_pos + dy);
     return 2;
   }
   
+  obj->walk_frame = 0;
   obj->state = STATE_WALK;
   obj->direction = direction;
   ctx->is_busy += 1;
@@ -130,10 +204,11 @@ int set_walk_object_to_direction(
 }
 
 
-int update_walk_frame(Object* obj) {
+int update_walk_frame(Context* ctx, Object* obj) {
   if (obj->walk_frame >= WALK_FRAMES) {
     obj->state = STATE_STAY;
-    obj->walk_frame = 0;
+    //obj->walk_frame = 0;
+    ctx->is_busy -= 1;
     return 0;
   }
   
@@ -179,21 +254,27 @@ int make_cell_from_char(
   success |= make_object(ctx, OBJECT_GRASS, x_pos, y_pos, &obj);
   success |= push_object_to_cell(obj, cell);
   
-  if (cell_symbol == '#') {
-    success |= make_object(ctx, OBJECT_WALL, x_pos, y_pos, &obj);
-    success |= push_object_to_cell(obj, cell);
-  }
-  else if (cell_symbol == '^') {
-    success |= make_object(ctx, OBJECT_WALL_TOP, x_pos, y_pos, &obj);
-    success |= push_object_to_cell(obj, cell);
-  }
-  else if (cell_symbol == '@') {
-    success |= make_object(ctx, OBJECT_HERO, x_pos, y_pos, &obj);
-    success |= push_object_to_cell(obj, cell);
-  }
-  else if (cell_symbol == 'B') {
-    success |= make_object(ctx, OBJECT_BARREL, x_pos, y_pos, &obj);
-    success |= push_object_to_cell(obj, cell);
+  switch (cell_symbol) {
+    case '#':
+      success |= make_object(ctx, OBJECT_WALL, x_pos, y_pos, &obj);
+      success |= push_object_to_cell(obj, cell);
+      break;
+    case '^':
+      success |= make_object(ctx, OBJECT_WALL_TOP, x_pos, y_pos, &obj);
+      success |= push_object_to_cell(obj, cell);
+      break;
+    case '@':
+      success |= make_object(ctx, OBJECT_HERO, x_pos, y_pos, &obj);
+      success |= push_object_to_cell(obj, cell);
+      break;
+    case 'B':
+      success |= make_object(ctx, OBJECT_BARREL, x_pos, y_pos, &obj);
+      success |= push_object_to_cell(obj, cell);
+      break;
+    case 'h':
+      success |= make_object(ctx, OBJECT_HUMAN, x_pos, y_pos, &obj);
+      success |= push_object_to_cell(obj, cell);
+      break;
   }
   
   return success;
@@ -350,7 +431,19 @@ int render_level(Context* ctx) {
         obj = ctx->level->cells[x][y]->objects[z];
         
         if (obj->state == STATE_STAY) {
-          success |= render_surface_pos(x, y, obj->tile->image, ctx->renderer);
+          if (! obj->walkable) {
+            success |= render_surface_pos(x, y, obj->tile->image, ctx->renderer);
+          }
+          else {
+            success |= render_surface_part_pos(
+              obj->walk_frame,
+              obj->direction,
+              obj->x_pos,
+              obj->y_pos,
+              obj->walk_tile->image,
+              ctx->renderer
+            );
+          }
         }
       }
     }

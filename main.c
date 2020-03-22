@@ -21,10 +21,16 @@ int load_tiles(Context* ctx) {
   success |= make_tile("wall_top", "./tiles/wall_top.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
-  success |= make_tile("hero_walk", "./tiles/hero_walk.png", ctx->renderer, &tile);
+  success |= make_tile("human_walk", "./tiles/human_walk.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
-  success |= make_tile("hero", "./tiles/hero.png", ctx->renderer, &tile);
+  success |= make_tile("human", "./tiles/human.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
+  success |= make_tile("hero_walk", "./tiles/human_walk.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
+  success |= make_tile("hero", "./tiles/human.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
   success |= make_tile("barrel", "./tiles/barrel.png", ctx->renderer, &tile);
@@ -50,7 +56,7 @@ void render_iterface(Context* ctx) {
     .h = ICON_SIZE,
   };
 
-  if (SDL_RenderCopyEx(ctx->renderer, attack->image, NULL, &dst_rect, 0, 0, SDL_FLIP_NONE)) {
+  if (SDL_RenderCopy(ctx->renderer, attack->image, NULL, &dst_rect)) {
     dp("Can't render a texture. SDL_Error: %s\n", SDL_GetError());
   }
 }
@@ -70,7 +76,7 @@ void update_walkers(
         if (obj->state == STATE_WALK) {
           dp("`%s` walks `%u`.\n", obj->tile->name, obj->direction);
           
-          if (! update_walk_frame(obj)) {
+          if (! update_walk_frame(ctx, obj)) {
             int dx = 0;
             int dy = 0;
             
@@ -86,8 +92,6 @@ void update_walkers(
               level->cells[x][y],
               level->cells[x + dx][y + dy]
             );
-            
-            ctx->is_busy -= 1;
           }
         }
       }
@@ -96,18 +100,18 @@ void update_walkers(
 }
 
 
-void handle_click(Context* ctx, unsigned x_px, unsigned y_px) {
-  int x_pos = x_px / CELL_WIDTH;
-  int y_pos = y_px / CELL_HEIGHT;
-  dp("Click at pos %u;%u", x_pos, y_pos);
+void handle_click(Context* ctx, int x_px, int y_px) {
+  int win_w = ctx->window_width;
+  int win_h = ctx->window_height;
+  int x_rel_pos = (x_px - win_w / 2) / CELL_WIDTH;
+  int y_rel_pos = (y_px - win_h / 2) / CELL_HEIGHT;
+  int x_pos = ctx->hero->x_pos + x_rel_pos;
+  int y_pos = ctx->hero->y_pos + y_rel_pos;
+  dp("Click at pos %d;%d\n", x_pos, y_pos);
   
   if (ctx->mode == MODE_ATTACK) {
     // Reached target
-    // TODO: Check int overflow (is it necessary for pos?)
-    if (
-      abs((int)ctx->hero->x_pos - x_pos) < 2
-      && abs((int)ctx->hero->y_pos - y_pos) < 2
-    ) {
+    if (abs(x_rel_pos) < 2 && abs(y_rel_pos) < 2) {
       Cell* target_cell = ctx->level->cells[x_pos][y_pos];
       Object* target_obj = target_cell->objects[target_cell->depth - 1];
       dp("Attack `%s` at pos %u;%u", target_obj->tile->name, target_obj->x_pos, target_obj->y_pos);
@@ -119,6 +123,29 @@ void handle_click(Context* ctx, unsigned x_px, unsigned y_px) {
       ctx->mode = MODE_NORMAL;
     }
   }
+  else if (ctx->mode == MODE_TALK) {
+    if (abs(x_rel_pos) < 2 && abs(y_rel_pos) < 2) {
+      Cell* target_cell = ctx->level->cells[x_pos][y_pos];
+      Object* target_obj = target_cell->objects[target_cell->depth - 1];
+      dp("Talk with `%s` at pos %u;%u", target_obj->tile->name, target_obj->x_pos, target_obj->y_pos);
+      
+      ctx->mode = MODE_NORMAL;
+    }
+  }
+}
+
+
+int render_object_message(Context* ctx, Object* obj) {
+  // XXX: Just test
+  SDL_Rect dst_rect = {
+    .x = obj->x_px - 50, // message offset
+    .y = obj->y_px - 50,
+    .w = obj->messages[0]->w,
+    .h = obj->messages[0]->h
+  };
+  
+  SDL_RenderCopy(ctx->renderer, obj->messages[0]->image, NULL, &dst_rect);
+  return 0;
 }
 
 
@@ -141,6 +168,7 @@ void render_loop(
   update_walkers(ctx, window);
   render_level(ctx);
   render_iterface(ctx);
+  render_object_message(ctx, ctx->hero);
   
   SDL_RenderPresent(ctx->renderer);
 }
@@ -151,6 +179,11 @@ void handle_events(Context* ctx) {
   int mouse_x, mouse_y;
   
   if (SDL_PollEvent(&event)) {
+    if (ctx->is_busy) {
+      SDL_FlushEvents(0, 0xffffffff); // all
+      return;
+    }
+    
     if (event.type == SDL_QUIT) {
       ctx->is_running = 0;
     } else if (event.type == SDL_KEYDOWN) {
@@ -172,8 +205,13 @@ void handle_events(Context* ctx) {
           set_walk_object_to_direction(ctx, ctx->hero, RIGHT);
           break;
         case SDLK_q:
-          dp("Enter to attack mode\n");
+          dp("Toggle attack mode\n");
           if (ctx->mode == MODE_NORMAL) ctx->mode = MODE_ATTACK;
+          else ctx->mode = MODE_NORMAL;
+          break;
+        case SDLK_e:
+          dp("Toggle talk mode\n");
+          if (ctx->mode == MODE_NORMAL) ctx->mode = MODE_TALK;
           else ctx->mode = MODE_NORMAL;
           break;
         case SDLK_ESCAPE:
@@ -232,15 +270,13 @@ int main(void) {
   ctx.hero = hero;
   
   SDL_EventState(SDL_MOUSEMOTION, SDL_IGNORE);
+  
   /** Main part */
   
   while (ctx.is_running) {
     SDL_Delay(SECOND / FPS);
     render_loop(&ctx, window);
-    
-    if (! ctx.is_busy) {
-      handle_events(&ctx);
-    }
+    handle_events(&ctx);
   }
 
 cleanup:

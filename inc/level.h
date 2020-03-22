@@ -17,12 +17,21 @@
 #define WALK_STEP_PX 16
 
 
+typedef struct {
+  char* text;
+  SDL_Texture* image;
+  unsigned w;
+  unsigned h;
+} Message;
+
+
 typedef enum ObjType {
   OBJECT_ERROR,
   OBJECT_GRASS,
   OBJECT_WALL,
   OBJECT_WALL_TOP,
   OBJECT_HERO,
+  OBJECT_HUMAN,
   OBJECT_BARREL
 } ObjType;
 
@@ -60,9 +69,12 @@ typedef struct Object {
   char can_walk;
   char passable;
   char walkable;
+  char talkable;
   
   char walk_frame;
   ObjDirection direction;
+  
+  Message** messages;
 } Object;
 
 
@@ -96,7 +108,8 @@ typedef struct Level {
 
 typedef enum GameMode {
   MODE_NORMAL,
-  MODE_ATTACK
+  MODE_ATTACK,
+  MODE_TALK
 } GameMode;
 
 
@@ -130,7 +143,7 @@ int set_walk_object_to_direction(
 );
 
 
-int update_walk_frame(Object* obj);
+int update_walk_frame(Context* ctx, Object* obj);
 
 
 int make_cell_from_char(
