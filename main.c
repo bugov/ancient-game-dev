@@ -36,6 +36,9 @@ int load_tiles(Context* ctx) {
   success |= make_tile("barrel", "./tiles/barrel.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
+  success |= make_tile("door", "./tiles/door.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
   return success;
 }
 
@@ -101,19 +104,36 @@ void update_walkers(
 
 
 void handle_click(Context* ctx, int x_px, int y_px) {
-  int win_w = ctx->window_width;
-  int win_h = ctx->window_height;
-  int x_rel_pos = (x_px - win_w / 2) / CELL_WIDTH;
-  int y_rel_pos = (y_px - win_h / 2) / CELL_HEIGHT;
+  int x_rel_px = x_px - ctx->window_width / 2 - CELL_WIDTH / 2;
+  int y_rel_px = y_px - ctx->window_height / 2 - CELL_HEIGHT / 2;
+  int x_rel_pos = x_rel_px / CELL_WIDTH;
+  int y_rel_pos = y_rel_px / CELL_HEIGHT;
+  
+  // fix pos
+  if (x_px > ctx->window_width / 2 + CELL_WIDTH / 2) {
+    x_rel_pos += 1;
+  }
+  if (y_px > ctx->window_height / 2 + CELL_HEIGHT / 2) {
+    y_rel_pos += 1;
+  }
+  
+  dp("Click at rel pos %d;%d\n", x_rel_pos, y_rel_pos);
+  
   int x_pos = ctx->hero->x_pos + x_rel_pos;
   int y_pos = ctx->hero->y_pos + y_rel_pos;
   dp("Click at pos %d;%d\n", x_pos, y_pos);
   
+  Cell* target_cell = ctx->level->cells[x_pos][y_pos];
+  Object* target_obj = target_cell->objects[target_cell->depth - 1];
+  
+  // Click on hero
+  if (x_rel_pos == 0 && y_rel_pos == 0) {
+    return;
+  }
+  
   if (ctx->mode == MODE_ATTACK) {
     // Reached target
     if (abs(x_rel_pos) < 2 && abs(y_rel_pos) < 2) {
-      Cell* target_cell = ctx->level->cells[x_pos][y_pos];
-      Object* target_obj = target_cell->objects[target_cell->depth - 1];
       dp("Attack `%s` at pos %u;%u", target_obj->tile->name, target_obj->x_pos, target_obj->y_pos);
       attack_object(ctx->hero, target_obj);
       
@@ -125,12 +145,18 @@ void handle_click(Context* ctx, int x_px, int y_px) {
   }
   else if (ctx->mode == MODE_TALK) {
     if (abs(x_rel_pos) < 2 && abs(y_rel_pos) < 2) {
-      Cell* target_cell = ctx->level->cells[x_pos][y_pos];
-      Object* target_obj = target_cell->objects[target_cell->depth - 1];
       dp("Talk with `%s` at pos %u;%u", target_obj->tile->name, target_obj->x_pos, target_obj->y_pos);
       
       ctx->mode = MODE_NORMAL;
     }
+  } else { // MODE_NORMAL
+      // door
+      switch (target_obj->type) {
+        case OBJECT_DOOR:
+          dp("Toggle door passable\n");
+          target_obj->animation_frame ^= 1; // closed / opened
+          target_obj->passable ^= 1;
+      }
   }
 }
 
@@ -168,7 +194,7 @@ void render_loop(
   update_walkers(ctx, window);
   render_level(ctx);
   render_iterface(ctx);
-  render_object_message(ctx, ctx->hero);
+  //render_object_message(ctx, ctx->hero);
   
   SDL_RenderPresent(ctx->renderer);
 }

@@ -30,6 +30,7 @@ typedef enum ObjType {
   OBJECT_GRASS,
   OBJECT_WALL,
   OBJECT_WALL_TOP,
+  OBJECT_DOOR,
   OBJECT_HERO,
   OBJECT_HUMAN,
   OBJECT_BARREL
@@ -71,7 +72,8 @@ typedef struct Object {
   char walkable;
   char talkable;
   
-  char walk_frame;
+  char animation_frame;
+  
   ObjDirection direction;
   
   Message** messages;

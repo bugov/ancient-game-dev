@@ -45,6 +45,7 @@ int make_message(
 char* obj_type_to_str(ObjType type) {
   switch (type) {
     case OBJECT_GRASS: return "grass";
+    case OBJECT_DOOR: return "door";
     case OBJECT_WALL: return "wall";
     case OBJECT_WALL_TOP: return "wall_top";
     case OBJECT_HERO: return "hero";
@@ -59,6 +60,7 @@ char* obj_type_to_str(ObjType type) {
 
 ObjType str_to_obj_type(char* str) {
   if (strcmp("grass", str) == 0) return OBJECT_GRASS;
+  if (strcmp("door", str) == 0) return OBJECT_DOOR;
   if (strcmp("wall_top", str) == 0) return OBJECT_WALL_TOP;
   if (strcmp("wall", str) == 0) return OBJECT_WALL;
   if (strcmp("hero", str) == 0) return OBJECT_HERO;
@@ -85,6 +87,7 @@ int make_object(
   obj->y_pos = y_pos;
   obj->x_px = x_pos * CELL_WIDTH;
   obj->y_px = y_pos * CELL_HEIGHT;
+  obj->animation_frame = 0;
   
   Tile* tile;
   char* obj_type_name = obj_type_to_str(type);
@@ -124,6 +127,7 @@ int make_object(
   
   // Passability
   switch (type) {
+    case OBJECT_DOOR:
     case OBJECT_HERO:
     case OBJECT_HUMAN:
     case OBJECT_BARREL:
@@ -151,10 +155,18 @@ int make_object(
     }
     obj->walk_tile = tile;
     obj->direction = DOWN;
-    obj->walk_frame = 0;
+    obj->animation_frame = 0;
   }
   
   return 0;
+}
+
+
+/**
+  Find buildings / locations (closed spaces)
+*/
+int fix_object_tiles(Context* ctx) {
+
 }
 
 
@@ -195,7 +207,7 @@ int set_walk_object_to_direction(
     return 2;
   }
   
-  obj->walk_frame = 0;
+  obj->animation_frame = 0;
   obj->state = STATE_WALK;
   obj->direction = direction;
   ctx->is_busy += 1;
@@ -205,15 +217,15 @@ int set_walk_object_to_direction(
 
 
 int update_walk_frame(Context* ctx, Object* obj) {
-  if (obj->walk_frame >= WALK_FRAMES) {
+  if (obj->animation_frame >= WALK_FRAMES) {
     obj->state = STATE_STAY;
-    //obj->walk_frame = 0;
+    //obj->animation_frame = 0;
     ctx->is_busy -= 1;
     return 0;
   }
   
   dp("Object walks...\n");
-  obj->walk_frame += 1;
+  obj->animation_frame += 1;
   
   unsigned dx = 0;
   unsigned dy = 0;
@@ -225,8 +237,8 @@ int update_walk_frame(Context* ctx, Object* obj) {
     case RIGHT: dx = 1; break;
   }
   
-  obj->x_px = obj->x_pos * CELL_WIDTH + dx * (obj->walk_frame * WALK_STEP_PX);
-  obj->y_px = obj->y_pos * CELL_HEIGHT + dy * (obj->walk_frame * WALK_STEP_PX);
+  obj->x_px = obj->x_pos * CELL_WIDTH + dx * (obj->animation_frame * WALK_STEP_PX);
+  obj->y_px = obj->y_pos * CELL_HEIGHT + dy * (obj->animation_frame * WALK_STEP_PX);
   
   return 1;
 }
@@ -273,6 +285,10 @@ int make_cell_from_char(
       break;
     case 'h':
       success |= make_object(ctx, OBJECT_HUMAN, x_pos, y_pos, &obj);
+      success |= push_object_to_cell(obj, cell);
+      break;
+    case 'D':
+      success |= make_object(ctx, OBJECT_DOOR, x_pos, y_pos, &obj);
       success |= push_object_to_cell(obj, cell);
       break;
   }
@@ -432,11 +448,18 @@ int render_level(Context* ctx) {
         
         if (obj->state == STATE_STAY) {
           if (! obj->walkable) {
-            success |= render_surface_pos(x, y, obj->tile->image, ctx->renderer);
+            success |= render_surface_part_pos(
+              0,
+              obj->animation_frame,
+              x,
+              y,
+              obj->tile->image,
+              ctx->renderer
+            );
           }
           else {
             success |= render_surface_part_pos(
-              obj->walk_frame,
+              obj->animation_frame,
               obj->direction,
               obj->x_pos,
               obj->y_pos,
@@ -464,10 +487,10 @@ int render_level(Context* ctx) {
             case LEFT: dx_pos = -1; break;
             case RIGHT: dx_pos = 1; break;
           }
-          unsigned to_x_px = obj->x_pos * CELL_WIDTH + dx_pos * obj->walk_frame * WALK_STEP_PX;
-          unsigned to_y_px = obj->y_pos * CELL_WIDTH + dy_pos * obj->walk_frame * WALK_STEP_PX;
+          unsigned to_x_px = obj->x_pos * CELL_WIDTH + dx_pos * obj->animation_frame * WALK_STEP_PX;
+          unsigned to_y_px = obj->y_pos * CELL_WIDTH + dy_pos * obj->animation_frame * WALK_STEP_PX;
           
-          unsigned from_x_px = obj->walk_frame * CELL_WIDTH;
+          unsigned from_x_px = obj->animation_frame * CELL_WIDTH;
           unsigned from_y_px = obj->direction * CELL_HEIGHT;
           
           success |= render_surface_part_px(
