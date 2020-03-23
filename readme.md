@@ -14,4 +14,10 @@
 - [ ] Object vision
 - [ ] Pickable objects & inventory
 - [x] Doors close/open states
+- [x] Find rooms (fix grass -> floor)
+
+## License
+
+- Code under GPLv3
+- Art / Music / Texts under CC-BY-NC
 

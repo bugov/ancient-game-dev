@@ -36,6 +36,12 @@ int load_tiles(Context* ctx) {
   success |= make_tile("door", "./tiles/door.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
+  success |= make_tile("inventory", "./tiles/inventory.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
+  success |= make_tile("foilhat", "./tiles/foilhat.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
   return success;
 }
 
@@ -58,6 +64,71 @@ void render_iterface(Context* ctx) {
 
   if (SDL_RenderCopy(ctx->renderer, attack->image, NULL, &dst_rect)) {
     dp("Can't render a texture. SDL_Error: %s\n", SDL_GetError());
+  }
+}
+
+void render_inventory(Context* ctx) {
+  unsigned inv_width_pos = 5;
+  unsigned inv_height_pos = 5;
+  
+  for (int y = 0, tile_y = 0; y < inv_height_pos; ++y) {
+    if (y > 0) tile_y = 1;
+    if (y == inv_height_pos - 1) tile_y = 2;
+    
+    for (int x = 0, tile_x = 0; x < inv_width_pos; ++x) {
+      if (x > 0) tile_x = 1;
+      if (x == inv_width_pos - 1) tile_x = 2;
+    
+      // inventory interface
+      render_surface_part_pos(
+        1,
+        1,
+        x + ctx->hero->x_pos - inv_width_pos / 2,
+        y + ctx->hero->y_pos - inv_height_pos / 2,
+        ctx->inventory_tile->image,
+        ctx->renderer
+      );
+    
+      render_surface_part_pos(
+        tile_x,
+        tile_y,
+        x + ctx->hero->x_pos - inv_width_pos / 2,
+        y + ctx->hero->y_pos - inv_height_pos / 2,
+        ctx->inventory_tile->image,
+        ctx->renderer
+      );
+      
+      // inventory slots borders
+      if (x > 2 && y > 0) {
+        render_surface_part_px(
+          0,
+          3 * CELL_HEIGHT,
+          (x + ctx->hero->x_pos - inv_width_pos / 2) * CELL_WIDTH - CELL_WIDTH / 2,
+          (y + ctx->hero->y_pos - inv_height_pos / 2) * CELL_HEIGHT - CELL_HEIGHT / 2,
+          ctx->inventory_tile->image,
+          ctx->renderer
+        );
+      }
+      
+      // inventory slots items
+      unsigned offset_x_ps = ctx->hero->x_px;
+      unsigned offset_y_ps = (ctx->hero->y_pos - inv_height_pos / 2) * CELL_HEIGHT - CELL_HEIGHT / 2;
+      
+      for (unsigned inv_x = 0; inv_x < INVENTORY_WIDTH; ++inv_x) {
+        for (unsigned inv_y = 0; inv_y < INVENTORY_HEIGHT; ++inv_y) {
+          if (ctx->hero->slots[inv_x][inv_y]->obj_type != OBJECT_ERROR) {
+            render_surface_part_px(
+              ctx->hero->slots[inv_x][inv_y]->animation_frame,
+              1 * CELL_HEIGHT, // offset 1 for minimized icon (for inventory slot)
+              offset_x_ps + (inv_x + 1) * CELL_WIDTH / 2,
+              offset_y_ps + (inv_y + 1) * CELL_HEIGHT / 2,
+              ctx->hero->slots[inv_x][inv_y]->tile->image,
+              ctx->renderer
+            );
+          }
+        }
+      }
+    }
   }
 }
 
@@ -140,6 +211,21 @@ void handle_click(Context* ctx, int x_px, int y_px) {
       ctx->mode = MODE_NORMAL;
     }
   }
+  else if (ctx->mode == MODE_INVENTORY) {
+    // Calc slots top-left corner
+    int slot_x_pos = x_rel_px / (CELL_WIDTH / 2);
+    int slot_y_pos = (y_rel_px + CELL_HEIGHT * 2) / (CELL_HEIGHT / 2);
+    
+    // pos fix
+    if (x_px > ctx->window_width / 2 + CELL_WIDTH / 2) slot_x_pos += 1;
+    if (y_px - CELL_HEIGHT * 2 > ctx->window_height / 2 + CELL_HEIGHT / 2) slot_y_pos += 1;
+    dp("Click on inventory slot: %d;%d\n", slot_x_pos, slot_y_pos);
+    
+    if (ctx->hero->slots[slot_x_pos][slot_y_pos]->obj_type == OBJECT_ERROR) {
+      return;
+    }
+    ctx->hero->slots[slot_x_pos][slot_y_pos]->animation_frame = 1;
+  }
   else if (ctx->mode == MODE_TALK) {
     if (abs(x_rel_pos) < 2 && abs(y_rel_pos) < 2) {
       dp("Talk with `%s` at pos %u;%u", target_obj->tile->name, target_obj->x_pos, target_obj->y_pos);
@@ -192,6 +278,9 @@ void render_loop(
   render_level(ctx);
   render_iterface(ctx);
   //render_object_message(ctx, ctx->hero);
+  if (ctx->mode == MODE_INVENTORY) {
+    render_inventory(ctx);
+  }
   
   SDL_RenderPresent(ctx->renderer);
 }
@@ -237,8 +326,17 @@ void handle_events(Context* ctx) {
           if (ctx->mode == MODE_NORMAL) ctx->mode = MODE_TALK;
           else ctx->mode = MODE_NORMAL;
           break;
+        case SDLK_i:
+          dp("Toggle inventory mode\n");
+          if (ctx->mode == MODE_NORMAL) ctx->mode = MODE_INVENTORY;
+          else ctx->mode = MODE_NORMAL;
+          break;
         case SDLK_ESCAPE:
-          ctx->is_running = 0;
+          if (ctx->mode == MODE_NORMAL) {
+            ctx->is_running = 0;
+          } else {
+            ctx->mode = MODE_NORMAL;
+          }
           break;
       }
     } else if (event.type == SDL_MOUSEBUTTONDOWN)
@@ -290,11 +388,15 @@ int main(void) {
   
   make_level_from_file(&ctx, "./level0.txt", &level);
   
-  Object* hero = level->cells[1][1]->objects[1];
+  Object* hero = level->cells[2][2]->objects[1];
   ctx.level = level;
   ctx.hero = hero;
   
   fix_objects_tile(&ctx);
+  
+  Tile* tmp_tile = NULL;
+  find_in_tile_store(ctx.tile_store, "inventory", &tmp_tile);
+  ctx.inventory_tile = tmp_tile;
   
   SDL_EventState(SDL_MOUSEMOTION, SDL_IGNORE);
   

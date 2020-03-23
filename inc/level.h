@@ -15,6 +15,8 @@
 #define MIN_CELL_CAPACITY 2
 #define WALK_FRAMES 6
 #define WALK_STEP_PX 16
+#define INVENTORY_WIDTH 4
+#define INVENTORY_HEIGHT 8
 
 
 typedef struct {
@@ -29,11 +31,11 @@ typedef enum ObjType {
   OBJECT_ERROR,
   OBJECT_GRASS,
   OBJECT_WALL,
-  OBJECT_WALL_TOP,
   OBJECT_DOOR,
   OBJECT_HERO,
   OBJECT_HUMAN,
-  OBJECT_BARREL
+  OBJECT_BARREL,
+  OBJECT_FOILHAT,
 } ObjType;
 
 
@@ -47,6 +49,16 @@ typedef enum ObjState {
 typedef enum ObjDirection {
   UP, LEFT, DOWN, RIGHT
 } ObjDirection;
+
+
+typedef struct {
+  unsigned x_pos;
+  unsigned y_pos;
+  
+  ObjType obj_type;
+  Tile* tile;
+  unsigned animation_frame;
+} Slot;
 
 
 /**
@@ -77,6 +89,8 @@ typedef struct Object {
   ObjDirection direction;
   
   Message** messages;
+  
+  Slot*** slots;
 } Object;
 
 
@@ -111,7 +125,8 @@ typedef struct Level {
 typedef enum GameMode {
   MODE_NORMAL,
   MODE_ATTACK,
-  MODE_TALK
+  MODE_TALK,
+  MODE_INVENTORY
 } GameMode;
 
 
@@ -121,10 +136,14 @@ typedef struct Context {
   Level* level;
   Object* hero;
   SDL_Renderer* renderer;
+  
   unsigned window_width;
   unsigned window_height;
+  
   char is_running;
   unsigned is_busy;
+  
+  Tile* inventory_tile;
 } Context;
 
 

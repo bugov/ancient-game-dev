@@ -50,6 +50,7 @@ char* obj_type_to_str(ObjType type) {
     case OBJECT_HERO: return "hero";
     case OBJECT_HUMAN: return "human";
     case OBJECT_BARREL: return "barrel";
+    case OBJECT_FOILHAT: return "foilhat";
     default:
       dp("Unknown type for convering to string.\n");
       return "error";
@@ -64,6 +65,7 @@ ObjType str_to_obj_type(char* str) {
   if (strcmp("hero", str) == 0) return OBJECT_HERO;
   if (strcmp("human", str) == 0) return OBJECT_HUMAN;
   if (strcmp("barrel", str) == 0) return OBJECT_BARREL;
+  if (strcmp("foilhat", str) == 0) return OBJECT_FOILHAT;
   return OBJECT_ERROR;
 }
 
@@ -97,6 +99,26 @@ int make_object(
   Message* msg_hello = NULL;
   make_message(ctx, "hello!", &msg_hello);
   
+  // Slots (XXX: FTGJ add foil hat)
+  if (obj->type == OBJECT_HERO) {
+    obj->slots = (Slot***)malloc(sizeof(Slot**) * INVENTORY_WIDTH);
+    
+    for (int x = 0; x < INVENTORY_WIDTH; ++x) {
+      obj->slots[x] = (Slot**)malloc(sizeof(Slot*) * INVENTORY_HEIGHT);
+      
+      for (int y = 0; y < INVENTORY_HEIGHT; ++y) {
+        obj->slots[x][y] = (Slot*)malloc(sizeof(Slot));
+        obj->slots[x][y]->obj_type = OBJECT_ERROR;
+        obj->slots[x][y]->animation_frame = 0;
+      }
+    }
+    // XXX: are x_pos, y_pos necessary?
+    Tile* tile = NULL;
+    find_in_tile_store(ctx->tile_store, "foilhat", &tile);
+    obj->slots[3][6]->tile = tile;
+    obj->slots[3][6]->obj_type = OBJECT_FOILHAT;
+  }
+  
   // Talks
   switch (type) {
     case OBJECT_HUMAN:
@@ -119,7 +141,10 @@ int make_object(
       obj->hp = 5;
       obj->base_attack = 2;
       break;
-    case OBJECT_BARREL: obj->hp = 1; break;
+    case OBJECT_FOILHAT:
+    case OBJECT_BARREL:
+      obj->hp = 1;
+      break;
     default: obj->hp = 10000;
   }
   
@@ -164,6 +189,10 @@ int set_walk_object_to_direction(
   Object* obj,
   ObjDirection direction
 ) {
+  if (ctx->mode != MODE_NORMAL) {
+    return 1;
+  }
+
   if (! obj->walkable) {
     dp("Object isn't walkable.\n");
     return 1;
@@ -274,6 +303,10 @@ int make_cell_from_char(
       break;
     case 'D':
       success |= make_object(ctx, OBJECT_DOOR, x_pos, y_pos, &obj);
+      success |= push_object_to_cell(obj, cell);
+      break;
+    case '4':
+      success |= make_object(ctx, OBJECT_FOILHAT, x_pos, y_pos, &obj);
       success |= push_object_to_cell(obj, cell);
       break;
   }
@@ -429,6 +462,61 @@ void fix_objects_tile(Context* ctx) {
         if (bottom_cell->objects[bottom_cell->depth - 1]->type == OBJECT_WALL) {
           dp("Fix wall tile on %u;%u\n", x, y);
           obj->animation_frame = 1; // wall from top
+        }
+      }
+      
+      // Find rooms - rects left2right top2bottom
+      if (
+        obj->type == OBJECT_WALL
+        && y < ctx->level->h - 1
+        && x < ctx->level->w - 1
+      ) {
+        Cell*** cells = ctx->level->cells;
+        // find corner
+        Object* r_obj = cells[x+1][y]->objects[cells[x+1][y]->depth - 1];
+        Object* b_obj = cells[x][y+1]->objects[cells[x][y+1]->depth - 1];
+        Object* rb_obj = cells[x+1][y+1]->objects[cells[x+1][y+1]->depth - 1];
+        
+        if (
+          r_obj->type == OBJECT_WALL
+          && b_obj->type == OBJECT_WALL
+          && rb_obj->type != OBJECT_WALL
+        ) {
+          dp("Find left-top house corner at pos: %d;%d\n", x, y);
+          int xx = x;
+          int yy = y;
+          
+          while (
+            xx < ctx->level->w
+            && (
+              cells[xx][y]->objects[cells[xx][y]->depth - 1]->type == OBJECT_WALL
+              || cells[xx][y]->objects[cells[xx][y]->depth - 1]->type == OBJECT_DOOR
+            )
+          ) {
+            xx++;
+          }
+          while (
+            yy < ctx->level->h
+            && (
+              cells[x][yy]->objects[cells[x][yy]->depth - 1]->type == OBJECT_WALL
+              || cells[x][yy]->objects[cells[x][yy]->depth - 1]->type == OBJECT_DOOR
+            )
+          ) {
+            yy++;
+          }
+          
+          dp("Find right-bottom house corner at pos: %d;%d\n", xx, yy);
+          
+          for (int tx = x; tx < xx; ++tx) {
+            for (int ty = y; ty < yy; ++ty) {
+              for (int z = 0; z < cells[tx][ty]->depth; ++z) {
+                if (cells[tx][ty]->objects[z]->type == OBJECT_GRASS) {
+                  dp("Fix grass tile on pos %d;%d\n", tx, ty);
+                  cells[tx][ty]->objects[z]->animation_frame = 1;
+                }
+              }
+            }
+          }
         }
       }
     }
