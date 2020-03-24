@@ -12,9 +12,11 @@
 - [x] Flush event queue with same events
 - [x] Stay movement tile after movement
 - [ ] Object vision
-- [ ] Pickable objects & inventory
+- [x] Pickable objects & inventory
+- [ ] Equipment
 - [x] Doors close/open states
 - [x] Find rooms (fix grass -> floor)
+- [ ] Move a character with mouse
 
 ## License
 

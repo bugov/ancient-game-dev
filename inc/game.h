@@ -18,6 +18,8 @@
 #define INV_SLOTS_HEIGHT 8
 #define INVENTORY_WIDTH 5
 #define INVENTORY_HEIGHT 5
+#define EQUIP_SLOTS_WIDTH 3
+#define EQUIP_SLOTS_HEIGHT 3
 
 
 typedef struct {
@@ -56,6 +58,8 @@ typedef struct Slot {
   unsigned x_pos;
   unsigned y_pos;
   
+  char is_equip;
+  
   ObjType obj_type;
   Tile* tile;
   unsigned animation_frame;
@@ -92,7 +96,8 @@ typedef struct Object {
   
   Message** messages;
   
-  Slot*** slots;
+  Slot*** slots; // inventory
+  Slot*** equip;
 } Object;
 
 

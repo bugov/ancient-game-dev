@@ -89,6 +89,7 @@ int make_object(
   obj->animation_frame = 0;
   obj->slots = NULL;
   obj->messages = NULL;
+  obj->equip = NULL;
   
   Tile* tile;
   char* obj_type_name = obj_type_to_str(type);
@@ -97,7 +98,7 @@ int make_object(
   }
   obj->tile = tile;
   
-  // Slots (XXX: FTGJ add foil hat)
+  // Slots 
   if (obj->type == OBJECT_HERO) {
     obj->slots = (Slot***)malloc(sizeof(Slot**) * INV_SLOTS_WIDTH);
     
@@ -110,13 +111,36 @@ int make_object(
         obj->slots[x][y]->animation_frame = 0;
         obj->slots[x][y]->x_pos = x;
         obj->slots[x][y]->y_pos = y;
+        obj->slots[x][y]->is_equip = 0;
       }
     }
     
+    // XXX: FTGJ add foil hat
     Tile* tile = NULL;
     find_in_tile_store(ctx->tile_store, "foilhat", &tile);
-    obj->slots[3][6]->tile = tile;
-    obj->slots[3][6]->obj_type = OBJECT_FOILHAT;
+    obj->slots[1][0]->tile = tile;
+    obj->slots[1][0]->obj_type = OBJECT_FOILHAT;
+    
+    // Equipment
+    obj->equip = (Slot***)malloc(sizeof(Slot**) * EQUIP_SLOTS_WIDTH);
+    
+    for (int x = 0; x < EQUIP_SLOTS_WIDTH; ++x) {
+      obj->equip[x] = (Slot**)malloc(sizeof(Slot*) * EQUIP_SLOTS_HEIGHT);
+      
+      for (int y = 0; y < EQUIP_SLOTS_HEIGHT; ++y) {
+        obj->equip[x][y] = (Slot*)malloc(sizeof(Slot));
+        obj->equip[x][y]->obj_type = OBJECT_ERROR;
+        obj->equip[x][y]->animation_frame = 0;
+        obj->equip[x][y]->x_pos = x;
+        obj->equip[x][y]->y_pos = y;
+        obj->equip[x][y]->is_equip = 1;
+      }
+    }
+    
+    // XXX: FTGJ add foil hat
+    find_in_tile_store(ctx->tile_store, "foilhat", &tile);
+    obj->equip[1][0]->tile = tile;
+    obj->equip[1][0]->obj_type = OBJECT_FOILHAT;
   }
   
   // Takeable
@@ -205,6 +229,19 @@ void free_object(Object* obj) {
     }
     free(obj->slots);
   }
+  obj->slots = NULL;
+  
+  if (obj->equip != NULL) {
+    for (int x = 0; x < EQUIP_SLOTS_WIDTH; ++x) {
+      for (int y = 0; y < EQUIP_SLOTS_HEIGHT; ++y) {
+        free(obj->equip[x][y]);
+      }
+      free(obj->equip[x]);
+    }
+    free(obj->equip);
+  }
+  obj->equip = NULL;
+  
   free(obj);
 }
 
