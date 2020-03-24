@@ -1,5 +1,4 @@
-#include "level.h"
-#include "sdlike.h"
+#include "game.h"
 
 #define MESSAGE_FONT_SIZE 24
 
@@ -88,6 +87,8 @@ int make_object(
   obj->x_px = x_pos * CELL_WIDTH;
   obj->y_px = y_pos * CELL_HEIGHT;
   obj->animation_frame = 0;
+  obj->slots = NULL;
+  obj->messages = NULL;
   
   Tile* tile;
   char* obj_type_name = obj_type_to_str(type);
@@ -96,30 +97,40 @@ int make_object(
   }
   obj->tile = tile;
   
-  Message* msg_hello = NULL;
-  make_message(ctx, "hello!", &msg_hello);
-  
   // Slots (XXX: FTGJ add foil hat)
   if (obj->type == OBJECT_HERO) {
-    obj->slots = (Slot***)malloc(sizeof(Slot**) * INVENTORY_WIDTH);
+    obj->slots = (Slot***)malloc(sizeof(Slot**) * INV_SLOTS_WIDTH);
     
-    for (int x = 0; x < INVENTORY_WIDTH; ++x) {
-      obj->slots[x] = (Slot**)malloc(sizeof(Slot*) * INVENTORY_HEIGHT);
+    for (int x = 0; x < INV_SLOTS_WIDTH; ++x) {
+      obj->slots[x] = (Slot**)malloc(sizeof(Slot*) * INV_SLOTS_HEIGHT);
       
-      for (int y = 0; y < INVENTORY_HEIGHT; ++y) {
+      for (int y = 0; y < INV_SLOTS_HEIGHT; ++y) {
         obj->slots[x][y] = (Slot*)malloc(sizeof(Slot));
         obj->slots[x][y]->obj_type = OBJECT_ERROR;
         obj->slots[x][y]->animation_frame = 0;
+        obj->slots[x][y]->x_pos = x;
+        obj->slots[x][y]->y_pos = y;
       }
     }
-    // XXX: are x_pos, y_pos necessary?
+    
     Tile* tile = NULL;
     find_in_tile_store(ctx->tile_store, "foilhat", &tile);
     obj->slots[3][6]->tile = tile;
     obj->slots[3][6]->obj_type = OBJECT_FOILHAT;
   }
   
+  // Takeable
+  switch (type) {
+    case OBJECT_FOILHAT:
+      obj->takeable = 1;
+      break;
+    default: obj->takeable = 0;
+  }
+  
   // Talks
+  Message* msg_hello = NULL;
+  make_message(ctx, "hello!", &msg_hello);
+  
   switch (type) {
     case OBJECT_HUMAN:
     case OBJECT_HERO:
@@ -128,7 +139,7 @@ int make_object(
     default: obj->talkable = 0;
   }
   
-  if (obj->talkable) {
+  if (obj->talkable) { // XXX: free
     obj->messages = (Message**)malloc(sizeof(Message*) * 1); // message array
     obj->messages[0] = msg_hello;
   }
@@ -181,6 +192,20 @@ int make_object(
   }
   
   return 0;
+}
+
+
+void free_object(Object* obj) {
+  if (obj->slots != NULL) {
+    for (int x = 0; x < INV_SLOTS_WIDTH; ++x) {
+      for (int y = 0; y < INV_SLOTS_HEIGHT; ++y) {
+        free(obj->slots[x][y]);
+      }
+      free(obj->slots[x]);
+    }
+    free(obj->slots);
+  }
+  free(obj);
 }
 
 

@@ -10,13 +10,14 @@
 #include <SDL2/SDL.h>
 #include "sdlike.h"
 
-
 #define MAX_CELL_CAPACITY 256
 #define MIN_CELL_CAPACITY 2
 #define WALK_FRAMES 6
 #define WALK_STEP_PX 16
-#define INVENTORY_WIDTH 4
-#define INVENTORY_HEIGHT 8
+#define INV_SLOTS_WIDTH 4
+#define INV_SLOTS_HEIGHT 8
+#define INVENTORY_WIDTH 5
+#define INVENTORY_HEIGHT 5
 
 
 typedef struct {
@@ -51,7 +52,7 @@ typedef enum ObjDirection {
 } ObjDirection;
 
 
-typedef struct {
+typedef struct Slot {
   unsigned x_pos;
   unsigned y_pos;
   
@@ -83,6 +84,7 @@ typedef struct Object {
   char passable;
   char walkable;
   char talkable;
+  char takeable;
   
   char animation_frame;
   
@@ -144,7 +146,38 @@ typedef struct Context {
   unsigned is_busy;
   
   Tile* inventory_tile;
+  Slot* selected_slot;
 } Context;
+
+
+void handle_inventory_clicks(
+  Context* ctx,
+  int x_rel_px,
+  int y_rel_px
+);
+
+
+int take_object_into_inventory(
+  Context* ctx,
+  Object* src,
+  Object* dst
+);
+
+
+void swap_inventory_slots(
+  Object* obj,
+  Slot* a,
+  Slot* b
+);
+
+
+void drop_selected_slot(
+  Context* ctx,
+  Object* obj
+);
+
+
+void render_inventory(Context* ctx);
 
 
 int make_object(
@@ -156,6 +189,7 @@ int make_object(
   Object** obj_ptr
 );
 
+void free_object(Object* obj);
 
 int set_walk_object_to_direction(
   Context* ctx,

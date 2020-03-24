@@ -1,5 +1,4 @@
-#include "level.h"
-#include "sdlike.h"
+#include "game.h"
 
 
 int load_tiles(Context* ctx) {
@@ -67,71 +66,6 @@ void render_iterface(Context* ctx) {
   }
 }
 
-void render_inventory(Context* ctx) {
-  unsigned inv_width_pos = 5;
-  unsigned inv_height_pos = 5;
-  
-  for (int y = 0, tile_y = 0; y < inv_height_pos; ++y) {
-    if (y > 0) tile_y = 1;
-    if (y == inv_height_pos - 1) tile_y = 2;
-    
-    for (int x = 0, tile_x = 0; x < inv_width_pos; ++x) {
-      if (x > 0) tile_x = 1;
-      if (x == inv_width_pos - 1) tile_x = 2;
-    
-      // inventory interface
-      render_surface_part_pos(
-        1,
-        1,
-        x + ctx->hero->x_pos - inv_width_pos / 2,
-        y + ctx->hero->y_pos - inv_height_pos / 2,
-        ctx->inventory_tile->image,
-        ctx->renderer
-      );
-    
-      render_surface_part_pos(
-        tile_x,
-        tile_y,
-        x + ctx->hero->x_pos - inv_width_pos / 2,
-        y + ctx->hero->y_pos - inv_height_pos / 2,
-        ctx->inventory_tile->image,
-        ctx->renderer
-      );
-      
-      // inventory slots borders
-      if (x > 2 && y > 0) {
-        render_surface_part_px(
-          0,
-          3 * CELL_HEIGHT,
-          (x + ctx->hero->x_pos - inv_width_pos / 2) * CELL_WIDTH - CELL_WIDTH / 2,
-          (y + ctx->hero->y_pos - inv_height_pos / 2) * CELL_HEIGHT - CELL_HEIGHT / 2,
-          ctx->inventory_tile->image,
-          ctx->renderer
-        );
-      }
-      
-      // inventory slots items
-      unsigned offset_x_ps = ctx->hero->x_px;
-      unsigned offset_y_ps = (ctx->hero->y_pos - inv_height_pos / 2) * CELL_HEIGHT - CELL_HEIGHT / 2;
-      
-      for (unsigned inv_x = 0; inv_x < INVENTORY_WIDTH; ++inv_x) {
-        for (unsigned inv_y = 0; inv_y < INVENTORY_HEIGHT; ++inv_y) {
-          if (ctx->hero->slots[inv_x][inv_y]->obj_type != OBJECT_ERROR) {
-            render_surface_part_px(
-              ctx->hero->slots[inv_x][inv_y]->animation_frame,
-              1 * CELL_HEIGHT, // offset 1 for minimized icon (for inventory slot)
-              offset_x_ps + (inv_x + 1) * CELL_WIDTH / 2,
-              offset_y_ps + (inv_y + 1) * CELL_HEIGHT / 2,
-              ctx->hero->slots[inv_x][inv_y]->tile->image,
-              ctx->renderer
-            );
-          }
-        }
-      }
-    }
-  }
-}
-
 
 void update_walkers(
   Context* ctx,
@@ -185,19 +119,19 @@ void handle_click(Context* ctx, int x_px, int y_px) {
     y_rel_pos += 1;
   }
   
-  dp("Click at rel pos %d;%d\n", x_rel_pos, y_rel_pos);
+  dp("Click at rel px: %d;%d pos %d;%d\n",
+    x_rel_px, y_rel_px, x_rel_pos, y_rel_pos);
   
   int x_pos = ctx->hero->x_pos + x_rel_pos;
   int y_pos = ctx->hero->y_pos + y_rel_pos;
   dp("Click at pos %d;%d\n", x_pos, y_pos);
   
-  Cell* target_cell = ctx->level->cells[x_pos][y_pos];
-  Object* target_obj = target_cell->objects[target_cell->depth - 1];
-  
-  // Click on hero
-  if (x_rel_pos == 0 && y_rel_pos == 0) {
+  if (x_pos < 0 || y_pos < 0 || x_pos >= ctx->level->w || y_pos >= ctx->level->h) {
+    dp("Click out of level!\n");
     return;
   }
+  Cell* target_cell = ctx->level->cells[x_pos][y_pos];
+  Object* target_obj = target_cell->objects[target_cell->depth - 1];
   
   if (ctx->mode == MODE_ATTACK) {
     // Reached target
@@ -211,35 +145,35 @@ void handle_click(Context* ctx, int x_px, int y_px) {
       ctx->mode = MODE_NORMAL;
     }
   }
-  else if (ctx->mode == MODE_INVENTORY) {
-    // Calc slots top-left corner
-    int slot_x_pos = x_rel_px / (CELL_WIDTH / 2);
-    int slot_y_pos = (y_rel_px + CELL_HEIGHT * 2) / (CELL_HEIGHT / 2);
-    
-    // pos fix
-    if (x_px > ctx->window_width / 2 + CELL_WIDTH / 2) slot_x_pos += 1;
-    if (y_px - CELL_HEIGHT * 2 > ctx->window_height / 2 + CELL_HEIGHT / 2) slot_y_pos += 1;
-    dp("Click on inventory slot: %d;%d\n", slot_x_pos, slot_y_pos);
-    
-    if (ctx->hero->slots[slot_x_pos][slot_y_pos]->obj_type == OBJECT_ERROR) {
-      return;
-    }
-    ctx->hero->slots[slot_x_pos][slot_y_pos]->animation_frame = 1;
-  }
   else if (ctx->mode == MODE_TALK) {
     if (abs(x_rel_pos) < 2 && abs(y_rel_pos) < 2) {
       dp("Talk with `%s` at pos %u;%u", target_obj->tile->name, target_obj->x_pos, target_obj->y_pos);
       
       ctx->mode = MODE_NORMAL;
     }
-  } else { // MODE_NORMAL
-      switch (target_obj->type) {
-        case OBJECT_DOOR:
-          dp("Toggle door passable\n");
-          target_obj->animation_frame ^= 1; // closed / opened
-          target_obj->passable ^= 1;
-          break;
-      }
+  }
+  
+  // Handle inventory mouse clicks.
+  else if (ctx->mode == MODE_INVENTORY) {
+    handle_inventory_clicks(ctx, x_rel_px, y_rel_px);
+  }
+  
+  else { // MODE_NORMAL
+    if (abs(x_rel_pos) > 1 || abs(y_rel_pos) > 1) return;
+    
+    if (target_obj->takeable) {
+      take_object_into_inventory(ctx, target_obj, ctx->hero);
+      return;
+    }
+    
+    switch (target_obj->type) {
+      case OBJECT_DOOR:
+        target_obj->animation_frame ^= 1; // closed / opened
+        target_obj->passable ^= 1;
+        break;
+      default:
+        return;
+    }
   }
 }
 
@@ -276,7 +210,7 @@ void render_loop(
   
   update_walkers(ctx, window);
   render_level(ctx);
-  render_iterface(ctx);
+  //render_iterface(ctx);
   //render_object_message(ctx, ctx->hero);
   if (ctx->mode == MODE_INVENTORY) {
     render_inventory(ctx);
@@ -354,8 +288,8 @@ void handle_events(Context* ctx) {
 int main(void) {
   Context ctx = {
     .mode = MODE_NORMAL,
-    .window_width = 640,
-    .window_height = 480,
+    .window_width = 824,
+    .window_height = 580,
     .is_running = 1,
     .is_busy = 0
   };
@@ -388,9 +322,11 @@ int main(void) {
   
   make_level_from_file(&ctx, "./level0.txt", &level);
   
-  Object* hero = level->cells[2][2]->objects[1];
+  Object* hero = level->cells[5][4]->objects[1];
+  dp("Get a hero: %u\n", hero->type);
   ctx.level = level;
   ctx.hero = hero;
+  ctx.selected_slot = NULL;
   
   fix_objects_tile(&ctx);
   
