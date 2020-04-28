@@ -10,8 +10,11 @@
 #include <SDL2/SDL.h>
 #include "sdlike.h"
 
+#define SEED 9293757
+
 #define MAX_CELL_CAPACITY 256
 #define MIN_CELL_CAPACITY 2
+#define ATTACK_FRAMES 4
 #define WALK_FRAMES 6
 #define WALK_STEP_PX 16
 #define INV_SLOTS_WIDTH 4
@@ -20,6 +23,7 @@
 #define INVENTORY_HEIGHT 5
 #define EQUIP_SLOTS_WIDTH 3
 #define EQUIP_SLOTS_HEIGHT 3
+#define RERENDER_RANGE 8
 
 
 typedef struct {
@@ -39,6 +43,8 @@ typedef enum ObjType {
   OBJECT_HUMAN,
   OBJECT_BARREL,
   OBJECT_FOILHAT,
+  OBJECT_WATER,
+  OBJECT_BRIDGE,
 } ObjType;
 
 
@@ -46,6 +52,7 @@ typedef enum ObjState {
   STATE_ERROR,
   STATE_STAY,
   STATE_WALK,
+  STATE_ATTACK,
 } ObjState;
 
 
@@ -75,6 +82,7 @@ typedef struct Object {
   ObjState state;
   Tile* tile;
   Tile* walk_tile;
+  Tile* attack_tile;
   
   int hp;
   unsigned base_attack;
@@ -89,6 +97,8 @@ typedef struct Object {
   char walkable;
   char talkable;
   char takeable;
+  char visibility;
+  char base_visibility_range;
   
   char animation_frame;
   
@@ -132,6 +142,7 @@ typedef struct Level {
 typedef enum GameMode {
   MODE_NORMAL,
   MODE_ATTACK,
+  MODE_ANIMATION,
   MODE_TALK,
   MODE_INVENTORY
 } GameMode;
@@ -231,6 +242,9 @@ int remove_object_from_cell (
 int is_cell_passable(Cell* cell);
 
 
+int is_cell_visible(Cell* cell);
+
+
 int make_level_from_file(
   Context* ctx,
   char* path,
@@ -242,10 +256,23 @@ int make_level_from_file(
 void fix_objects_tile(Context* ctx);
 
 
-void attack_object(Object* src, Object* dst);
+int set_attack_object(
+  Context* ctx,
+  Object* src,
+  Object* dst
+);
+
+
+int update_attack_frame(
+  Context* ctx,
+  Object* obj
+);
 
 
 int render_level(Context* ctx);
+
+
+void update_animation(Context* ctx);
 
 
 int swap_object_between_cells(

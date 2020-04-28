@@ -17,10 +17,16 @@ int load_tiles(Context* ctx) {
   success |= make_tile("wall", "./tiles/wall.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
+  success |= make_tile("human_attack", "./tiles/human_attack.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
   success |= make_tile("human_walk", "./tiles/human_walk.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
   success |= make_tile("human", "./tiles/human.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
+  success |= make_tile("hero_attack", "./tiles/human_attack.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
   success |= make_tile("hero_walk", "./tiles/human_walk.png", ctx->renderer, &tile);
@@ -39,6 +45,15 @@ int load_tiles(Context* ctx) {
   add_to_tile_store(ctx->tile_store, tile);
   
   success |= make_tile("foilhat", "./tiles/foilhat.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
+  success |= make_tile("water", "./tiles/water.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
+  success |= make_tile("bridge", "./tiles/bridge.png", ctx->renderer, &tile);
+  add_to_tile_store(ctx->tile_store, tile);
+  
+  success |= make_tile("dark", "./tiles/dark.png", ctx->renderer, &tile);
   add_to_tile_store(ctx->tile_store, tile);
   
   return success;
@@ -63,44 +78,6 @@ void render_iterface(Context* ctx) {
 
   if (SDL_RenderCopy(ctx->renderer, attack->image, NULL, &dst_rect)) {
     dp("Can't render a texture. SDL_Error: %s\n", SDL_GetError());
-  }
-}
-
-
-void update_walkers(
-  Context* ctx,
-  SDL_Window* window
-) {
-  Level* level = ctx->level;
-  
-  for (int x = 0; x < level->w; ++x) {
-    for (int y = 0; y < level->h; ++y) {
-      for (int z = 0; z < level->cells[x][y]->depth; ++z) {
-        Object* obj = level->cells[x][y]->objects[z];
-        
-        if (obj->state == STATE_WALK) {
-          dp("`%s` walks `%u`.\n", obj->tile->name, obj->direction);
-          
-          if (! update_walk_frame(ctx, obj)) {
-            int dx = 0;
-            int dy = 0;
-            
-            switch (obj->direction) {
-              case UP: dy = -1; break;
-              case DOWN: dy = 1; break;
-              case LEFT: dx = -1; break;
-              case RIGHT: dx = 1; break;
-            }
-            
-            swap_object_between_cells(
-              obj,
-              level->cells[x][y],
-              level->cells[x + dx][y + dy]
-            );
-          }
-        }
-      }
-    }
   }
 }
 
@@ -137,7 +114,7 @@ void handle_click(Context* ctx, int x_px, int y_px) {
     // Reached target
     if (abs(x_rel_pos) < 2 && abs(y_rel_pos) < 2) {
       dp("Attack `%s` at pos %u;%u", target_obj->tile->name, target_obj->x_pos, target_obj->y_pos);
-      attack_object(ctx->hero, target_obj);
+      set_attack_object(ctx, ctx->hero, target_obj);
       
       if (target_obj->hp < 0) {
         remove_object_from_cell(target_obj, target_cell);
@@ -196,7 +173,6 @@ void render_loop(
   Context* ctx,
   SDL_Window* window
 ) {
-  
   set_viewport(
     (ctx->window_width - CELL_WIDTH) / 2 - ctx->hero->x_px,
     (ctx->window_height - CELL_HEIGHT) / 2 - ctx->hero->y_px,
@@ -208,10 +184,13 @@ void render_loop(
   SDL_RenderClear(ctx->renderer);
   SDL_SetRenderDrawColor(ctx->renderer, 44, 44, 44, 44);
   
-  update_walkers(ctx, window);
+  update_animation(ctx);
   render_level(ctx);
+  SDL_Delay(SECOND / FPS);
+  
   //render_iterface(ctx);
   //render_object_message(ctx, ctx->hero);
+  
   if (ctx->mode == MODE_INVENTORY) {
     render_inventory(ctx);
   }
@@ -339,7 +318,6 @@ int main(void) {
   /** Main part */
   
   while (ctx.is_running) {
-    SDL_Delay(SECOND / FPS);
     render_loop(&ctx, window);
     handle_events(&ctx);
   }
