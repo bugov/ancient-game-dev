@@ -1,60 +1,30 @@
 #include "game.h"
 
-
 int load_tiles(Context* ctx) {
   int success = 0;
   Tile* tile = NULL;
   
-  success |= make_tile("attack-off", "./tiles/attack-off.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
+// Q&D shortcut for tile adding
+#define add_tile(...) do { success |= make_tile(__VA_ARGS__, ctx->renderer, &tile);\
+  add_to_tile_store(ctx->tile_store, tile); } while (0)
   
-  success |= make_tile("attack-on", "./tiles/attack-on.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("grass", "./tiles/grass.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("wall", "./tiles/wall.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("human_attack", "./tiles/human_attack.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("human_walk", "./tiles/human_walk.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("human", "./tiles/human.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("hero_attack", "./tiles/human_attack.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("hero_walk", "./tiles/human_walk.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("hero", "./tiles/human.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("barrel", "./tiles/barrel.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("door", "./tiles/door.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("inventory", "./tiles/inventory.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("foilhat", "./tiles/foilhat.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("water", "./tiles/water.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("bridge", "./tiles/bridge.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
-  
-  success |= make_tile("dark", "./tiles/dark.png", ctx->renderer, &tile);
-  add_to_tile_store(ctx->tile_store, tile);
+  add_tile("attack-off",    "./tiles/attack-off.png");
+  add_tile("attack-on",     "./tiles/attack-on.png");
+  add_tile("grass",         "./tiles/grass.png");
+  add_tile("wall",          "./tiles/wall.png");
+  add_tile("human_attack",  "./tiles/human_attack.png");
+  add_tile("human_walk",    "./tiles/human_walk.png");
+  add_tile("human",         "./tiles/human.png");
+  add_tile("hero_attack",   "./tiles/human_attack.png");
+  add_tile("hero_walk",     "./tiles/human_walk.png");
+  add_tile("hero",          "./tiles/human.png");
+  add_tile("barrel",        "./tiles/barrel.png");
+  add_tile("door",          "./tiles/door.png");
+  add_tile("inventory",     "./tiles/inventory.png");
+  add_tile("foilhat",       "./tiles/foilhat.png");
+  add_tile("water",         "./tiles/water.png");
+  add_tile("bridge",        "./tiles/bridge.png");
+  add_tile("dark",          "./tiles/dark.png");
   
   return success;
 }
@@ -136,6 +106,32 @@ void handle_click(Context* ctx, int x_px, int y_px) {
   }
   
   else { // MODE_NORMAL
+    // "Walking!" (c) some awesome George
+    // No Dijkstra, just stupid walk
+    if (target_obj->passable) {
+      int dx = ctx->hero->x_pos - target_obj->x_pos;
+      int dy = ctx->hero->y_pos - target_obj->y_pos;
+      int blocked = 0;
+      
+      if (abs(dx) < abs(dy)) {
+        if (dy < 0) blocked = set_walk_object_to_direction(ctx, ctx->hero, DOWN);
+        else blocked = set_walk_object_to_direction(ctx, ctx->hero, UP);
+        
+        if (blocked) {
+          if (dx < 0) set_walk_object_to_direction(ctx, ctx->hero, RIGHT);
+          else set_walk_object_to_direction(ctx, ctx->hero, LEFT);
+        }
+      } else {
+        if (dx < 0) blocked = set_walk_object_to_direction(ctx, ctx->hero, RIGHT);
+        else blocked = set_walk_object_to_direction(ctx, ctx->hero, LEFT);
+        
+        if (blocked) {
+          if (dy < 0) set_walk_object_to_direction(ctx, ctx->hero, DOWN);
+          else set_walk_object_to_direction(ctx, ctx->hero, UP);
+        }
+      }
+    }
+    
     if (abs(x_rel_pos) > 1 || abs(y_rel_pos) > 1) return;
     
     if (target_obj->takeable) {

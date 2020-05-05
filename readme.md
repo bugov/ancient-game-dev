@@ -17,7 +17,7 @@
 - [ ] Equipment
 - [x] Doors close/open states
 - [x] Find rooms (fix grass -> floor)
-- [ ] Move a character with mouse
+- [x] Move a character with mouse
 - [ ] Passable bridges
 - [ ] Move without freezing
 
